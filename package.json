@@ -26,5 +26,8 @@
   },
   "devDependencies": {
     "solc": "^0.8.35"
+  },
+  "overrides": {
+    "tmp": "^0.2.7"
   }
 }
