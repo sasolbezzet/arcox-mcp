@@ -132,6 +132,17 @@ function apiArcTokenKey(value, fallback = 'USDC') {
   return tokenKey === 'CIRBTC' ? 'cirBTC' : tokenKey
 }
 
+function swapRouteUnavailableQuote(error) {
+  const message = error?.message || String(error || '')
+  if (!/NO_SWAP_ROUTE|Route swap belum tersedia|No route available|Route or resource not found|Swap route not found|route is not supported/i.test(message)) return null
+  return {
+    available: false,
+    code: 'NO_SWAP_ROUTE',
+    error: 'Route swap belum tersedia dari Circle Stablecoin Service untuk pasangan/jumlah ini. Coba jumlah lebih besar, atau ulangi beberapa menit lagi.',
+    details: message,
+  }
+}
+
 function splitPlatformFeeUnits(amountUnits) {
   const feeBps = Number.isFinite(PLATFORM_FEE_BPS) && PLATFORM_FEE_BPS > 0 ? Math.floor(PLATFORM_FEE_BPS) : 0
   const feeUnits = (amountUnits * BigInt(feeBps)) / 10_000n
@@ -1598,8 +1609,10 @@ export async function executeSend(intent, owner) {
 }
 
 export async function executeSwap(intent, owner) {
-  const tokenIn = intent.tokenIn || 'USDC'
-  const tokenOut = intent.tokenOut || ''
+  const tokenIn = normalizeArcTokenKey(intent.tokenIn || 'USDC')
+  const tokenOut = normalizeArcTokenKey(intent.tokenOut || '', '')
+  const apiTokenIn = apiArcTokenKey(tokenIn)
+  const apiTokenOut = apiArcTokenKey(tokenOut, '')
   if (!intent.amount || Number(intent.amount) <= 0) throw new Error('Swap command needs amount, example: swap 10 USDC to EURC')
   if (!ARC_TOKENS[tokenIn]) throw new Error(`Unsupported swap input token: ${tokenIn}`)
   if (!ARC_TOKENS[tokenOut]) throw new Error('Swap command needs output token, example: swap 10 USDC to EURC')
@@ -1608,13 +1621,21 @@ export async function executeSwap(intent, owner) {
   const account = privateKeyToAccount(privateKey())
   const token = await backendSession(account)
   const walletData = await postJson('/api/wallet', { metamaskAddress: owner }, token)
-  const quote = await postJson('/api/quote', { metamaskAddress: owner, tokenIn, tokenOut, amountIn: intent.amount }, token)
+  let quote
+  try {
+    quote = await postJson('/api/quote', { metamaskAddress: owner, tokenIn: apiTokenIn, tokenOut: apiTokenOut, amountIn: intent.amount }, token)
+  } catch (error) {
+    quote = swapRouteUnavailableQuote(error)
+    if (!quote) throw error
+  }
   if (quote.available === false) {
     return {
       status: 'route_unavailable',
       action: 'swap',
       source: 'circle-wallet-proxy',
       owner,
+      tokenIn,
+      tokenOut,
       wallet: walletData.wallet,
       quote,
     }
@@ -1622,7 +1643,7 @@ export async function executeSwap(intent, owner) {
   let swap
   try {
     swap = await withTimeout(
-      postJson('/api/swap', { metamaskAddress: owner, tokenIn, tokenOut, amountIn: intent.amount }, token, SWAP_EXECUTION_TIMEOUT_MS),
+      postJson('/api/swap', { metamaskAddress: owner, tokenIn: apiTokenIn, tokenOut: apiTokenOut, amountIn: intent.amount }, token, SWAP_EXECUTION_TIMEOUT_MS),
       SWAP_EXECUTION_TIMEOUT_MS,
       `Circle swap backend did not respond within ${SWAP_EXECUTION_TIMEOUT_MS}ms. Check balances/history before retrying.`,
     )
@@ -1632,6 +1653,8 @@ export async function executeSwap(intent, owner) {
       action: 'swap',
       source: 'circle-wallet-proxy',
       owner,
+      tokenIn,
+      tokenOut,
       wallet: walletData.wallet,
       quote,
       error: error.message,
@@ -1643,6 +1666,8 @@ export async function executeSwap(intent, owner) {
     action: 'swap',
     source: 'circle-wallet-proxy',
     owner,
+    tokenIn,
+    tokenOut,
     wallet: walletData.wallet,
     quote,
     result: swap.result,
@@ -1660,11 +1685,20 @@ async function runPrompt() {
     prompt,
     intent,
     approval_required: true,
-    approval_mode: 'CLI --yes confirmation with local AGENT_PRIVATE_KEY signer',
+    approval_mode: 'MCP quote + previewId + explicit user confirmation',
     note: 'Private key stays in the local .env file. ARCOX DEX only receives status/metadata if you choose to report it.',
   }
   if (!hasFlag('yes')) {
     console.log(JSON.stringify({ ...preview, status: 'preview_only', next: 'Review this plan. Re-run with --yes to execute supported onchain actions.' }, null, 2))
+    return
+  }
+  if (['send', 'bridge', 'swap'].includes(intent.action)) {
+    console.log(JSON.stringify({
+      ...preview,
+      status: 'mcp_confirmation_required',
+      safe_next_step: 'Value-moving ARCOX actions must use MCP quote first, then execute with confirmed=true and the exact previewId after explicit user confirmation.',
+      blocked_action: intent.action,
+    }, null, 2))
     return
   }
   if (intent.action === 'send') {
@@ -1999,15 +2033,23 @@ export async function quoteSend(intent) {
 }
 
 export async function quoteSwap(intent) {
-  const tokenIn = String(intent.tokenIn || 'USDC').toUpperCase() === 'CIRBTC' ? 'CIRBTC' : String(intent.tokenIn || 'USDC').toUpperCase()
-  const tokenOut = String(intent.tokenOut || '').toUpperCase() === 'CIRBTC' ? 'CIRBTC' : String(intent.tokenOut || '').toUpperCase()
+  const tokenIn = normalizeArcTokenKey(intent.tokenIn || 'USDC')
+  const tokenOut = normalizeArcTokenKey(intent.tokenOut || '', '')
+  const apiTokenIn = apiArcTokenKey(tokenIn)
+  const apiTokenOut = apiArcTokenKey(tokenOut, '')
   const amountIn = String(intent.amountIn || intent.amount || '')
   if (!amountIn) throw new Error('Swap quote needs amountIn.')
   if (!ARC_TOKENS[tokenIn]) throw new Error(`Unsupported swap input token: ${tokenIn}`)
   if (!ARC_TOKENS[tokenOut]) throw new Error(`Unsupported swap output token: ${tokenOut}`)
   const { account } = wallet()
   const token = await backendSession(account)
-  const quote = await postJson('/api/quote', { metamaskAddress: account.address, tokenIn, tokenOut, amountIn }, token)
+  let quote
+  try {
+    quote = await postJson('/api/quote', { metamaskAddress: account.address, tokenIn: apiTokenIn, tokenOut: apiTokenOut, amountIn }, token)
+  } catch (error) {
+    quote = swapRouteUnavailableQuote(error)
+    if (!quote) throw error
+  }
   return {
     status: 'quote',
     action: 'swap',
@@ -2024,6 +2066,7 @@ export async function quoteSwap(intent) {
 
 export async function executeConfirmedBridge(intent) {
   if (intent.confirmed !== true) return quoteBridge(intent)
+  if (intent.mcpPreviewVerified !== true) throw new Error('MCP preview verification required before bridge execution.')
   const fromChain = normalizeChainName(intent.fromChain) || intent.fromChain
   const toChain = normalizeChainName(intent.toChain) || intent.toChain
   const { account } = wallet()
@@ -2074,6 +2117,7 @@ export async function executeConfirmedBridge(intent) {
 
 export async function executeConfirmedSend(intent) {
   if (intent.confirmed !== true) return quoteSend(intent)
+  if (intent.mcpPreviewVerified !== true) throw new Error('MCP preview verification required before send execution.')
   const { account } = wallet()
   const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   let result
@@ -2122,6 +2166,7 @@ export async function executeConfirmedSend(intent) {
 
 export async function executeConfirmedSwap(intent) {
   if (intent.confirmed !== true) return quoteSwap(intent)
+  if (intent.mcpPreviewVerified !== true) throw new Error('MCP preview verification required before swap execution.')
   const { account } = wallet()
   const result = await executeSwap({
     ...intent,

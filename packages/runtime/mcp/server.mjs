@@ -566,6 +566,7 @@ async function rpcResponse(message) {
       enforceSpendLimits(name, args)
       return result(id, await runValueMovingTool(name, args, () => executeConfirmedBridge({
           ...args,
+          mcpPreviewVerified: true,
           fromChain: fromChain || args.fromChain,
           toChain: toChain || args.toChain,
           deferMint: args.deferMint ?? !fastSource,
@@ -577,14 +578,14 @@ async function rpcResponse(message) {
     if (name === 'arcox_execute_send') {
       enforcePreview(name, args)
       enforceSpendLimits(name, args)
-      return result(id, await runValueMovingTool(name, args, () => executeConfirmedSend(args)))
+      return result(id, await runValueMovingTool(name, args, () => executeConfirmedSend({ ...args, mcpPreviewVerified: true })))
     }
     if (name === 'arcox_quote_swap') return result(id, attachPreview(name, args, await quoteSwap(args)))
     if (name === 'arcox_execute_swap' && args.confirmed !== true) return result(id, attachPreview('arcox_quote_swap', args, await quoteSwap(args)))
     if (name === 'arcox_execute_swap') {
       enforcePreview(name, args)
       enforceSpendLimits(name, args)
-      return result(id, await runValueMovingTool(name, args, () => executeConfirmedSwap(args)))
+      return result(id, await runValueMovingTool(name, args, () => executeConfirmedSwap({ ...args, mcpPreviewVerified: true })))
     }
     if (name === 'arcox_transaction_history') return result(id, transactionHistory())
     if (name === 'arcox_agent_job') {
