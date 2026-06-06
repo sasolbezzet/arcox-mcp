@@ -161,6 +161,7 @@ const tools = [
         token: { type: 'string', default: 'USDC' },
         source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
         previewId: { type: 'string' },
+        confirmationText: { type: 'string' },
         confirmed: { type: 'boolean' },
       },
       required: ['to', 'amount'],
@@ -452,11 +453,18 @@ function previewHash(name, args) {
   return createHash('sha256').update(stableJson(canonicalPreviewArgs(name, args))).digest('hex')
 }
 
+function sendConfirmationPhrase(canonical, previewId) {
+  const shortTo = String(canonical.to || '').slice(0, 6) + '...' + String(canonical.to || '').slice(-4)
+  return `CONFIRM SEND ${canonical.amount} ${canonical.token} FROM ${canonical.source.toUpperCase()} TO ${shortTo} ${previewId.slice(-6)}`
+}
+
 function attachPreview(name, args, quote) {
   const canonical = canonicalPreviewArgs(name, args)
   const hash = createHash('sha256').update(stableJson(canonical)).digest('hex')
   const previewId = `arcox-preview-${hash.slice(0, 16)}`
-  previewApprovals.set(previewId, { hash, canonical, action: canonicalPreviewAction(name), createdAt: Date.now(), expiresAt: Date.now() + PREVIEW_TTL_MS })
+  const action = canonicalPreviewAction(name)
+  const confirmationPhrase = action === 'arcox_execute_send' ? sendConfirmationPhrase(canonical, previewId) : ''
+  previewApprovals.set(previewId, { hash, canonical, action, confirmationPhrase, createdAt: Date.now(), expiresAt: Date.now() + PREVIEW_TTL_MS })
   return {
     ...quote,
     previewId,
@@ -467,7 +475,16 @@ function attachPreview(name, args, quote) {
       dailyLimitUsdc: DAILY_LIMIT_USDC,
     },
     riskChecks: quoteRiskChecks(name, quote),
-    executeInstruction: `After explicit user confirmation for this single operation only, call ${canonicalPreviewAction(name)} with confirmed=true and this exact previewId. For bulk requests, execute one chain at a time and ask for confirmation before each chain.`,
+    ...(confirmationPhrase ? {
+      confirmationRequired: {
+        required: true,
+        phrase: confirmationPhrase,
+        instruction: 'Do not execute automatically. Show this preview to the user and wait until the user replies with this exact confirmation phrase.',
+      },
+    } : {}),
+    executeInstruction: confirmationPhrase
+      ? `Only after the user replies exactly "${confirmationPhrase}", call ${action} with confirmed=true, this previewId, and confirmationText set to that exact phrase.`
+      : `After explicit user confirmation for this single operation only, call ${action} with confirmed=true and this exact previewId. For bulk requests, execute one chain at a time and ask for confirmation before each chain.`,
   }
 }
 
@@ -498,6 +515,12 @@ function enforcePreview(name, args) {
   const expected = createHash('sha256').update(stableJson(canonical)).digest('hex')
   if (expected !== preview.hash) {
     throw new Error(`Execution parameters differ from quote preview. Re-quote before executing. expected=${stableJson(preview.canonical)} received=${stableJson(canonical)}`)
+  }
+  if (name === 'arcox_execute_send') {
+    const text = String(args.confirmationText || '').trim()
+    if (!preview.confirmationPhrase || text !== preview.confirmationPhrase) {
+      throw new Error(`Explicit send confirmation required. Ask the user to reply exactly: ${preview.confirmationPhrase}`)
+    }
   }
   previewApprovals.delete(previewId)
 }

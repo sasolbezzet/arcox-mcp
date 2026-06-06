@@ -143,6 +143,41 @@ function swapRouteUnavailableQuote(error) {
   }
 }
 
+function shortAddress(value = '') {
+  const raw = String(value || '')
+  if (raw.length <= 12) return raw
+  return `${raw.slice(0, 6)}...${raw.slice(-4)}`
+}
+
+function sendPreviewDetails({ source, owner, from, to, token, amount, balance, platformFee, recipientReceives, networkFee, estimate, supported }) {
+  const warnings = []
+  if (!supported) warnings.push(`Saldo ${source} tidak cukup untuk mengirim ${amount} ${token}.`)
+  if (estimate?.error) warnings.push(`Estimasi fee gagal: ${estimate.error}`)
+  return {
+    title: `Send ${amount} ${token}`,
+    summary: `${source === 'circle' ? 'Circle Wallet proxy' : 'EOA agent wallet'} will send ${recipientReceives} ${token} to ${shortAddress(to)} after platform fee ${platformFee} ${token}.`,
+    sourceWallet: source,
+    owner,
+    fromAddress: typeof from === 'string' ? from : from?.address,
+    fromWalletId: typeof from === 'object' ? from?.id : undefined,
+    toAddress: to,
+    token,
+    grossAmount: amount,
+    platformFee,
+    recipientReceives,
+    balanceBefore: balance,
+    estimatedNetworkFee: networkFee,
+    supported: Boolean(supported),
+    warnings,
+    userMustCheck: [
+      'Recipient address is correct.',
+      'Token and amount are correct.',
+      'Platform fee and receive amount are acceptable.',
+      'This action moves funds and cannot be reversed after execution.',
+    ],
+  }
+}
+
 function splitPlatformFeeUnits(amountUnits) {
   const feeBps = Number.isFinite(PLATFORM_FEE_BPS) && PLATFORM_FEE_BPS > 0 ? Math.floor(PLATFORM_FEE_BPS) : 0
   const feeUnits = (amountUnits * BigInt(feeBps)) / 10_000n
@@ -1985,22 +2020,41 @@ export async function quoteSend(intent) {
       postJson('/api/send-estimate', { metamaskAddress: account.address, toAddress: getAddress(intent.to), amount: String(intent.amount), token: apiTokenKey, source: 'circle' }, authToken, SEND_ESTIMATE_TIMEOUT_MS).catch(error => ({ error: error.message })),
     ])
     const balance = circleBalances?.[apiTokenKey] || circleBalances?.[tokenKey] || '0'
+    const to = getAddress(intent.to)
+    const platformFee = estimate?.platformFee?.amount || '0'
+    const recipientReceives = estimate?.recipientReceives || String(intent.amount)
+    const networkFee = estimate?.fee || estimate?.estimatedFee || '0'
+    const supported = Number(balance) >= Number(intent.amount)
     return {
       status: 'quote',
       action: 'send',
       source: 'circle-wallet-proxy',
       owner: account.address,
       from: walletData.wallet,
-      to: getAddress(intent.to),
+      to,
       token: tokenKey,
       amount: String(intent.amount),
       balance,
-      platformFee: estimate?.platformFee?.amount || '0',
-      recipientReceives: estimate?.recipientReceives || String(intent.amount),
-      networkFee: estimate?.fee || estimate?.estimatedFee || '0',
-      supported: Number(balance) >= Number(intent.amount),
+      platformFee,
+      recipientReceives,
+      networkFee,
+      supported,
       approvalRequired: true,
       estimate,
+      preview: sendPreviewDetails({
+        source: 'circle',
+        owner: account.address,
+        from: walletData.wallet,
+        to,
+        token: tokenKey,
+        amount: String(intent.amount),
+        balance,
+        platformFee,
+        recipientReceives,
+        networkFee,
+        estimate,
+        supported,
+      }),
       safeNextStep: 'Ask the user to confirm before calling arcox_execute_send with source="circle" and confirmed=true.',
     }
   }
@@ -2014,20 +2068,38 @@ export async function quoteSend(intent) {
   ])
   const fee = routerQuote ? BigInt(routerQuote[0] ?? 0) : 0n
   const netAmount = routerQuote ? BigInt(routerQuote[1] ?? amount) : amount
+  const to = getAddress(intent.to)
+  const balanceText = formatUnits(balance, token.decimals)
+  const platformFee = formatUnits(fee, token.decimals)
+  const recipientReceives = formatUnits(netAmount, token.decimals)
+  const supported = balance >= amount
   return {
     status: 'quote',
     action: 'send',
     source: 'eoa-agent-wallet',
     owner: account.address,
-    to: getAddress(intent.to),
+    to,
     token: tokenKey,
     amount: String(intent.amount),
-    balance: formatUnits(balance, token.decimals),
+    balance: balanceText,
     router: router || null,
-    platformFee: formatUnits(fee, token.decimals),
-    recipientReceives: formatUnits(netAmount, token.decimals),
-    supported: balance >= amount,
+    platformFee,
+    recipientReceives,
+    supported,
     approvalRequired: true,
+    preview: sendPreviewDetails({
+      source: 'eoa',
+      owner: account.address,
+      from: account.address,
+      to,
+      token: tokenKey,
+      amount: String(intent.amount),
+      balance: balanceText,
+      platformFee,
+      recipientReceives,
+      networkFee: 'wallet-signed gas',
+      supported,
+    }),
     safeNextStep: 'Ask the user to confirm before calling arcox_execute_send with source="eoa" and confirmed=true.',
   }
 }
