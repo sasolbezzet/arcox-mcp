@@ -5,6 +5,7 @@ import { createServer } from 'http'
 import { spawn } from 'child_process'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
+import { homedir } from 'os'
 import {
   createPublicClient,
   createWalletClient,
@@ -447,17 +448,22 @@ Safety:
 }
 
 function loadLocalEnv() {
-  const agentEnv = join(AGENT_HOME, '.env')
-  const fallbackEnv = join(process.cwd(), '.env')
-  const envPath = existsSync(agentEnv) ? agentEnv : fallbackEnv
-  if (!existsSync(envPath)) return
-  const lines = readFileSync(envPath, 'utf8').split(/\r?\n/)
-  for (const line of lines) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
-    const [key, ...rest] = trimmed.split('=')
-    if (process.env[key]) continue
-    process.env[key] = rest.join('=').replace(/^['"]|['"]$/g, '')
+  const envPaths = [
+    process.env.ARCOX_AGENT_ENV,
+    join(process.cwd(), '.env'),
+    join(homedir(), '.arcox', '.env'),
+    join(AGENT_HOME, '.env'),
+  ].filter(Boolean)
+  for (const envPath of envPaths) {
+    if (!existsSync(envPath)) continue
+    const lines = readFileSync(envPath, 'utf8').split(/\r?\n/)
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
+      const [key, ...rest] = trimmed.split('=')
+      if (process.env[key]) continue
+      process.env[key] = rest.join('=').replace(/^['"]|['"]$/g, '')
+    }
   }
 }
 

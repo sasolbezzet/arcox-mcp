@@ -1,13 +1,51 @@
 {
-  "name": "arcox-mcp-monorepo",
-  "private": true,
+  "name": "arcox-mcp",
+  "private": false,
   "version": "0.1.0",
   "type": "module",
+  "description": "ARCOX DEX MCP server and terminal agent for retail swap, bridge, send, balances, history, retry bridge, and agentic jobs.",
+  "license": "MIT",
+  "homepage": "https://arc-dex-bice.vercel.app/?page=docs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sasolbezzet/arcox-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sasolbezzet/arcox-mcp/issues"
+  },
+  "keywords": [
+    "arcox",
+    "arc",
+    "mcp",
+    "dex",
+    "agent",
+    "circle",
+    "cctp"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "README.md",
+    "packages/runtime/bin",
+    "packages/runtime/mcp",
+    "packages/runtime/deployments",
+    "packages/runtime/artifacts",
+    "packages/runtime/contracts",
+    "packages/runtime/profile",
+    "packages/runtime/package.json",
+    "packages/mcp-server/server.mjs",
+    "packages/mcp-server/package.json",
+    "packages/cli/bin",
+    "packages/cli/package.json"
+  ],
   "workspaces": [
     "packages/*"
   ],
   "bin": {
-    "arcox-agent": "./packages/runtime/bin/arcox-codex-cli.mjs"
+    "arcox-mcp": "packages/mcp-server/server.mjs",
+    "arcox-agent": "packages/runtime/bin/arcox-codex-cli.mjs",
+    "arcox": "packages/cli/bin/arcox.mjs"
   },
   "scripts": {
     "agent": "node packages/runtime/bin/arcox-agent.mjs",
