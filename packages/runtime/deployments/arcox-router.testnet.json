@@ -10,7 +10,13 @@
       "chainId": 5042002,
       "domain": 26,
       "usdc": "0x3600000000000000000000000000000000000000",
-      "tokenMessenger": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"
+      "tokenMessenger": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      "verification": {
+        "sourcifyMatch": "exact_match",
+        "sourcePublished": true,
+        "explorer": "https://testnet.arcscan.app/address/0xDf800310443BEB589CEf91A09854203Ea36e43a7",
+        "sourcify": "https://repo.sourcify.dev/contracts/full_match/5042002/0xDf800310443BEB589CEf91A09854203Ea36e43a7/"
+      }
     },
     "Base_Sepolia": {
       "address": "0x9425cC5b3C8B9e0FCb35beBdE737B4365A614Acc",
@@ -18,7 +24,13 @@
       "chainId": 84532,
       "domain": 6,
       "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-      "tokenMessenger": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"
+      "tokenMessenger": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      "verification": {
+        "sourcifyMatch": "exact_match",
+        "sourcePublished": true,
+        "explorer": "https://base-sepolia.blockscout.com/address/0x9425cC5b3C8B9e0FCb35beBdE737B4365A614Acc",
+        "sourcify": "https://repo.sourcify.dev/contracts/full_match/84532/0x9425cC5b3C8B9e0FCb35beBdE737B4365A614Acc/"
+      }
     },
     "Arbitrum_Sepolia": {
       "address": "0x5dCAA895dDc7350cF0f9eb69E69536a4548b0cA7",
@@ -26,7 +38,13 @@
       "chainId": 421614,
       "domain": 3,
       "usdc": "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
-      "tokenMessenger": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"
+      "tokenMessenger": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      "verification": {
+        "sourcifyMatch": "exact_match",
+        "sourcePublished": true,
+        "explorer": "https://arbitrum-sepolia.blockscout.com/address/0x5dCAA895dDc7350cF0f9eb69E69536a4548b0cA7",
+        "sourcify": "https://repo.sourcify.dev/contracts/full_match/421614/0x5dCAA895dDc7350cF0f9eb69E69536a4548b0cA7/"
+      }
     },
     "Ethereum_Sepolia": {
       "address": "0x53aB114FeE64b177B8D6066056DfD03Ea38D0ef1",
@@ -34,7 +52,14 @@
       "chainId": 11155111,
       "domain": 0,
       "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-      "tokenMessenger": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA"
+      "tokenMessenger": "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      "verification": {
+        "sourcifyMatch": "exact_match",
+        "sourcePublished": true,
+        "explorer": "https://eth-sepolia.blockscout.com/address/0x53aB114FeE64b177B8D6066056DfD03Ea38D0ef1",
+        "routescan": "https://routescan.io/address/0x53aB114FeE64b177B8D6066056DfD03Ea38D0ef1?chainid=11155111",
+        "sourcify": "https://repo.sourcify.dev/contracts/full_match/11155111/0x53aB114FeE64b177B8D6066056DfD03Ea38D0ef1/"
+      }
     },
     "Solana_Devnet": {
       "address": "C7XUB3Ep67seiJAzz4Apeeus2AbxbnuqFzvodDWxqoTH",
@@ -42,7 +67,13 @@
       "chainId": "solana-devnet",
       "domain": 5,
       "usdc": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
-      "tokenMessenger": "CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe"
+      "tokenMessenger": "CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe",
+      "verification": {
+        "programAccountExists": true,
+        "executable": true,
+        "sourcePublished": false,
+        "note": "Solana Devnet program is executable. Source/IDL publish requires Anchor/Solana toolchain and an IDL artifact."
+      }
     }
   },
   "errors": {}

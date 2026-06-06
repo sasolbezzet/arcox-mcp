@@ -16,7 +16,8 @@
     "check": "node --check packages/runtime/bin/arcox-agent.mjs && node --check packages/runtime/mcp/server.mjs && node --check packages/mcp-server/server.mjs && node --check packages/cli/bin/arcox.mjs",
     "compile:router": "node packages/runtime/scripts/compile-router.mjs",
     "deploy:router": "node packages/runtime/scripts/deploy-router.mjs",
-    "deploy:solana-router": "node packages/runtime/scripts/deploy-solana-router.mjs"
+    "deploy:solana-router": "node packages/runtime/scripts/deploy-solana-router.mjs",
+    "verify:router": "node packages/runtime/scripts/verify-router.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.14",

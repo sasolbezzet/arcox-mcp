@@ -13,6 +13,7 @@
     "check": "node --check bin/arcox-agent.mjs && node --check mcp/server.mjs",
     "compile:router": "node scripts/compile-router.mjs",
     "deploy:router": "node scripts/deploy-router.mjs",
-    "deploy:solana-router": "node scripts/deploy-solana-router.mjs"
+    "deploy:solana-router": "node scripts/deploy-solana-router.mjs",
+    "verify:router": "node scripts/verify-router.mjs"
   }
 }
