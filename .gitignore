@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.env
+*.log
+
+packages/runtime/.env
+packages/runtime/.arcox-agent-history.json
+packages/runtime/.arcox-auto-mint/
+packages/runtime/node_modules/
+
+packages/**/node_modules/
+packages/**/target/
+packages/**/.anchor/
+packages/**/.turbo/

@@ -1,0 +1,13 @@
+{
+  "name": "@arcox/mcp-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "arcox-mcp": "./server.mjs"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs"
+  }
+}

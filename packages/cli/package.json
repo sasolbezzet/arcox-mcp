@@ -1,0 +1,13 @@
+{
+  "name": "@arcox/cli",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "arcox": "./bin/arcox.mjs"
+  },
+  "scripts": {
+    "start": "node bin/arcox.mjs",
+    "check": "node --check bin/arcox.mjs"
+  }
+}

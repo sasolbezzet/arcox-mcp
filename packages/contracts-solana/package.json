@@ -1,0 +1,9 @@
+{
+  "name": "@arcox/contracts-solana",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "deploy": "node ../runtime/scripts/deploy-solana-router.mjs"
+  }
+}
