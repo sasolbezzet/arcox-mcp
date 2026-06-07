@@ -604,7 +604,7 @@ async function rpcResponse(message) {
       enforceSpendLimits(name, args)
       return result(id, await runValueMovingTool(name, args, () => executeConfirmedSwap({ ...args, mcpPreviewVerified: true })))
     }
-    if (name === 'arcox_transaction_history') return result(id, transactionHistory())
+    if (name === 'arcox_transaction_history') return result(id, await transactionHistory())
     if (name === 'arcox_agent_job') {
       if (isValueMovingCall(name, args)) enforceSpendLimits(name, args)
       return result(id, await agentJob(args))

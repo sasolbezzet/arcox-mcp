@@ -75,6 +75,8 @@ const PLATFORM_FEE_BPS = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
 const SOLANA_FEE_TREASURY = process.env.SOLANA_FEE_TREASURY || '4kAf2Qxf9KnbnKo7ukPMMu8q1UButJYNik4yQtvWhExw'
 const AUTO_MINT_DIR = join(AGENT_HOME, '.arcox-auto-mint')
 const TX_HISTORY_FILE = join(AGENT_HOME, '.arcox-agent-history.json')
+const AUTO_MINT_STALE_MS = Number(process.env.AUTO_MINT_STALE_MS || 5 * 60 * 1000)
+const AUTO_MINT_MAX_RECOVERIES = Number(process.env.AUTO_MINT_MAX_RECOVERIES || 3)
 const ARC_TOKENS = {
   USDC: { address: ARC_USDC, decimals: 6 },
   EURC: { address: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a', decimals: 6 },
@@ -218,6 +220,27 @@ async function pushBackendHistory(owner, record) {
     await postJson('/api/tx-history', { metamaskAddress: owner, record: { ...record, owner, source: 'agent-mcp' } }, token)
   } catch (error) {
     console.error('[history] backend sync skipped:', error.message)
+  }
+}
+
+async function pullBackendHistory(owner) {
+  try {
+    if (!owner) return []
+    const account = privateKeyToAccount(privateKey())
+    const token = await backendSession(account)
+    const response = await fetch(`${ARCOX_BACKEND_URL}/api/tx-history`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      signal: AbortSignal.timeout(BACKEND_FETCH_TIMEOUT_MS),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`)
+    return Array.isArray(data.history) ? data.history : []
+  } catch (error) {
+    console.error('[history] backend pull skipped:', error.message)
+    return []
   }
 }
 
@@ -505,11 +528,31 @@ function command() {
 
 function writeAutoMintStatus(jobId, data) {
   mkdirSync(AUTO_MINT_DIR, { recursive: true })
-  writeFileSync(join(AUTO_MINT_DIR, `${jobId}.json`), JSON.stringify({ updatedAt: new Date().toISOString(), ...data }, null, 2))
+  const saved = { ...data, updatedAt: new Date().toISOString() }
+  writeFileSync(join(AUTO_MINT_DIR, `${jobId}.json`), JSON.stringify(saved, null, 2))
+  return saved
 }
 
 function autoMintJobId(burnTx) {
   return String(burnTx || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 72)
+}
+
+function spawnAutoMintWorker({ burnTx, from, to, owner }) {
+  const child = spawn(process.execPath, [
+    fileURLToPath(import.meta.url),
+    'auto-mint-bridge',
+    '--burn-tx', burnTx,
+    '--from-chain', from,
+    '--to-chain', to,
+    '--owner', owner,
+  ], {
+    cwd: AGENT_HOME,
+    env: process.env,
+    detached: true,
+    stdio: 'ignore',
+  })
+  child.unref()
+  return child.pid
 }
 
 function scheduleAutoMint({ burnTx, fromInfo, toInfo, owner }) {
@@ -523,22 +566,10 @@ function scheduleAutoMint({ burnTx, fromInfo, toInfo, owner }) {
     from: fromInfo.id,
     to: toInfo.id,
   })
-  const child = spawn(process.execPath, [
-    fileURLToPath(import.meta.url),
-    'auto-mint-bridge',
-    '--burn-tx', burnTx,
-    '--from-chain', fromInfo.id,
-    '--to-chain', toInfo.id,
-    '--owner', owner,
-  ], {
-    cwd: AGENT_HOME,
-    env: process.env,
-    detached: true,
-    stdio: 'ignore',
-  })
-  child.unref()
+  const pid = spawnAutoMintWorker({ burnTx, from: fromInfo.id, to: toInfo.id, owner })
   return {
     jobId,
+    pid,
     statusFile: join(AUTO_MINT_DIR, `${jobId}.json`),
   }
 }
@@ -2286,11 +2317,88 @@ function readAutoMintStatuses() {
   return autoMint
 }
 
-function syncAutoMintHistory() {
+function findByBurnTx(items, burnTx) {
+  const target = String(burnTx || '').toLowerCase()
+  if (!target) return null
+  return items.find(item => String(item?.burnTx || '').toLowerCase() === target) || null
+}
+
+function mergeHistoryById(localHistory, remoteHistory) {
+  const byId = new Map()
+  for (const item of [...localHistory, ...remoteHistory]) {
+    if (!item?.id) continue
+    byId.set(item.id, item)
+  }
+  return [...byId.values()].sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0)).slice(0, 100)
+}
+
+function syncCompletedAutoMintStatus(job, completed) {
+  if (!job?.burnTx || !completed?.mintTx) return job
+  const next = {
+    ...job,
+    status: job.result?.mintTx ? 'complete' : 'complete_external',
+    result: {
+      ...(job.result || {}),
+      status: 'submitted',
+      action: job.action || 'auto-mint-bridge',
+      owner: completed.owner || job.owner,
+      from: completed.from || job.from,
+      to: completed.to || job.to,
+      burnTx: completed.burnTx || job.burnTx,
+      mintTx: completed.mintTx,
+      mintExplorer: completed.mintExplorerUrl || completed.mintExplorer || job.result?.mintExplorer,
+    },
+    note: job.result?.mintTx ? job.note : 'Mint completed outside auto-mint worker; status synchronized from backend history.',
+  }
+  return writeAutoMintStatus(autoMintJobId(job.burnTx), next)
+}
+
+function recoverStaleAutoMint(job) {
+  if (!job?.burnTx || !['scheduled', 'running', 'rescheduled'].includes(job.status)) return job
+  const updatedAt = Date.parse(job.updatedAt || '')
+  if (!Number.isFinite(updatedAt) || Date.now() - updatedAt < AUTO_MINT_STALE_MS) return job
+  const recoveries = Number(job.recoveries || 0)
+  if (recoveries >= AUTO_MINT_MAX_RECOVERIES) return { ...job, status: 'stale', safeNextStep: 'Auto-mint worker reached recovery limit. Use retry bridge with the burn tx.' }
+  const pid = spawnAutoMintWorker({ burnTx: job.burnTx, from: job.from, to: job.to, owner: job.owner })
+  const next = {
+    ...job,
+    status: 'rescheduled',
+    recoveries: recoveries + 1,
+    lastRecoveryAt: new Date().toISOString(),
+    pid,
+  }
+  return writeAutoMintStatus(autoMintJobId(job.burnTx), next)
+}
+
+async function syncAutoMintHistory() {
   const history = readAgentHistory()
-  const autoMint = readAutoMintStatuses()
+  const owner = history.find(item => item.owner)?.owner || (() => {
+    try { return wallet().account.address } catch { return '' }
+  })()
+  const remoteHistory = await pullBackendHistory(owner)
+  let autoMint = readAutoMintStatuses()
   let changed = false
-  const merged = history.map(item => {
+  const localWithRemote = history.map(item => {
+    const remote = findByBurnTx(remoteHistory, item.burnTx)
+    if (remote?.status === 'success' && remote.mintTx && item.status !== 'success') {
+      changed = true
+      return {
+        ...item,
+        status: 'success',
+        mintTx: remote.mintTx,
+        mintExplorerUrl: remote.mintExplorerUrl || remote.mintExplorer,
+        note: remote.note || `${item.note || ''}\nMint completed and synchronized from backend history.`,
+        error: '',
+      }
+    }
+    return item
+  })
+  autoMint = autoMint.map(job => {
+    const remote = findByBurnTx(remoteHistory, job.burnTx)
+    if (remote?.status === 'success' && remote.mintTx) return syncCompletedAutoMintStatus(job, remote)
+    return recoverStaleAutoMint(job)
+  })
+  const merged = localWithRemote.map(item => {
     const status = autoMint.find(job => String(job.burnTx || '').toLowerCase() === String(item.burnTx || '').toLowerCase())
     if (!status?.result?.mintTx || item.status === 'success') return item
     changed = true
@@ -2304,12 +2412,13 @@ function syncAutoMintHistory() {
     pushBackendHistory(updated.owner || status.owner || '', updated)
     return updated
   })
-  if (changed) writeAgentHistory(merged)
-  return { history: merged, autoMint }
+  const finalHistory = mergeHistoryById(merged, remoteHistory.filter(item => item.source === 'agent-mcp'))
+  if (changed || finalHistory.length !== history.length) writeAgentHistory(finalHistory)
+  return { history: finalHistory, autoMint }
 }
 
-export function transactionHistory() {
-  const { history, autoMint } = syncAutoMintHistory()
+export async function transactionHistory() {
+  const { history, autoMint } = await syncAutoMintHistory()
   return { status: 'history', source: 'agent-local', history, autoMint }
 }
 
@@ -2411,7 +2520,7 @@ async function serve() {
     }
     if (req.method === 'GET' && req.url === '/history') {
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      return res.end(JSON.stringify(transactionHistory(), null, 2))
+      return res.end(JSON.stringify(await transactionHistory(), null, 2))
     }
     if (req.method === 'GET' && req.url === '/balances') {
       try {
