@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from 'crypto'
-import { existsSync, readFileSync, mkdirSync, writeFileSync, readdirSync } from 'fs'
+import { existsSync, readFileSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { createServer } from 'http'
 import { spawn } from 'child_process'
 import { dirname, join } from 'path'
@@ -41,6 +41,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const AGENT_HOME = dirname(__dirname)
+const loadedEnvFiles = []
 
 loadLocalEnv()
 
@@ -479,6 +480,7 @@ function loadLocalEnv() {
   ].filter(Boolean)
   for (const envPath of envPaths) {
     if (!existsSync(envPath)) continue
+    loadedEnvFiles.push(envPath)
     const lines = readFileSync(envPath, 'utf8').split(/\r?\n/)
     for (const line of lines) {
       const trimmed = line.trim()
@@ -488,6 +490,19 @@ function loadLocalEnv() {
       process.env[key] = rest.join('=').replace(/^['"]|['"]$/g, '')
     }
   }
+}
+
+function envSecurityWarnings() {
+  const warnings = []
+  for (const envPath of loadedEnvFiles) {
+    try {
+      const mode = statSync(envPath).mode & 0o777
+      if ((mode & 0o077) !== 0) {
+        warnings.push(`${envPath} permissions are ${mode.toString(8)}. Run: chmod 600 ${envPath}`)
+      }
+    } catch {}
+  }
+  return warnings
 }
 
 function loadRouterDeployments() {
@@ -1931,7 +1946,7 @@ export async function agentStatus() {
     publicClient.getBalance({ address: account.address }),
     publicClient.readContract({ address: ARC_USDC, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }).catch(() => 0n),
   ])
-  return { address: account.address, arcGasUsdc: formatUnits(nativeBalance, 18), usdc: formatUnits(usdcBalance, 6), rpc: ARC_RPC }
+  return { address: account.address, arcGasUsdc: formatUnits(nativeBalance, 18), usdc: formatUnits(usdcBalance, 6), rpc: ARC_RPC, envSecurityWarnings: envSecurityWarnings() }
 }
 
 async function arcTokenBalances(address) {

@@ -32,6 +32,7 @@ Create a working folder on the user's computer:
 ```bash
 mkdir -p ~/.arcox
 nano ~/.arcox/.env
+chmod 600 ~/.arcox/.env
 ```
 
 Minimum EVM setup:
@@ -160,4 +161,5 @@ ARCOX Pay invoice payment uses quote-before-execute. The execute call must pass 
 - Private keys stay on the user's computer in `.env`.
 - ARCOX DEX web UI does not receive the private key.
 - MCP execution is local to the user's agent process.
+- `arcox-agent status` reports `envSecurityWarnings` when the `.env` file is readable by group/other users.
 - Keep `.env` outside synced folders and never paste private keys into chat.
