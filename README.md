@@ -8,6 +8,7 @@ It exposes tools for:
 - Swap quote and execution
 - Bridge quote and execution
 - Send quote and execution
+- ARCOX Pay invoice/payment request tools
 - Bridge retry and transaction history
 - ARCOX Agentic Economy job actions
 - ARCOX DEX UI/action map for agents
@@ -124,6 +125,13 @@ The agent must not skip the preview step.
 - `arcox_execute_bridge`
 - `arcox_quote_send`
 - `arcox_execute_send`
+- `arcox_create_payment_request`
+- `arcox_get_payment_request`
+- `arcox_quote_payment_request`
+- `arcox_pay_payment_request`
+- `arcox_check_payment_status`
+- `arcox_simulate_circle_webhook`
+- `arcox_quote_eco_route_payment`
 - `arcox_retry_bridge`
 - `arcox_route_status`
 - `arcox_ui_map`
@@ -138,10 +146,14 @@ arcox-agent status
 arcox-agent "show all wallet balances"
 arcox-agent "quote bridge 1 usdc from arc to base"
 arcox-agent "send 1 eurc from eoa to 0x..."
+arcox-agent "create payment request 10 usdc to 0xMerchant for AI agent setup"
+arcox-agent "quote payment invoice inv_..."
 arcox-agent "retry bridge 0xBURN_TX from arbitrum sepolia to arc"
 ```
 
 For execution, inspect the preview first and then confirm.
+
+ARCOX Pay invoice payment uses quote-before-execute. The execute call must pass the quoted `previewId` and the same invoice amount, token, and merchant address from `previewArgs`.
 
 ## Security
 

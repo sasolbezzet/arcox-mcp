@@ -753,6 +753,34 @@ async function postJson(path, body, token = '', timeoutMs = BACKEND_FETCH_TIMEOU
   return data
 }
 
+async function patchJson(path, body, token = '', timeoutMs = BACKEND_FETCH_TIMEOUT_MS) {
+  const response = await fetch(`${ARCOX_BACKEND_URL}${path}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`)
+  return data
+}
+
+async function backendGet(path, token = '', timeoutMs = BACKEND_FETCH_TIMEOUT_MS) {
+  const response = await fetch(`${ARCOX_BACKEND_URL}${path}`, {
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`)
+  return data
+}
+
 async function getJson(url) {
   const response = await fetch(url, {
     headers: { Accept: 'application/json' },
@@ -2299,6 +2327,132 @@ export async function executeConfirmedSwap(intent) {
   }, account.address)
   await pushBackendHistory(account.address, rec)
   return result
+}
+
+function paymentInvoiceSummary(invoice) {
+  return {
+    invoiceId: invoice.invoiceId,
+    orderId: invoice.orderId,
+    amount: invoice.amount,
+    token: invoice.token,
+    network: invoice.network,
+    merchantAddress: invoice.merchantAddress,
+    memo: invoice.memo,
+    status: invoice.status,
+    paymentUrl: invoice.paymentUrl,
+    txHash: invoice.txHash,
+    paidAt: invoice.paidAt,
+    expiresAt: invoice.expiresAt,
+    timeline: invoice.timeline || [],
+  }
+}
+
+function assertPayableInvoice(invoice) {
+  if (!invoice?.invoiceId) throw new Error('Invoice not found.')
+  if (invoice.status === 'paid') throw new Error('Invoice already paid.')
+  if (invoice.status === 'expired') throw new Error('Invoice expired.')
+  if (invoice.status === 'cancelled' || invoice.status === 'failed') throw new Error(`Invoice status is ${invoice.status}.`)
+  if (Date.now() > new Date(invoice.expiresAt).getTime()) throw new Error('Invoice expired.')
+  if (invoice.token !== 'USDC' || invoice.network !== 'arc-testnet') throw new Error('Only USDC invoices on arc-testnet are supported.')
+}
+
+export async function createPaymentRequest(input = {}) {
+  const invoice = await postJson('/api/invoices', {
+    orderId: input.orderId,
+    amount: String(input.amount || ''),
+    token: input.token || 'USDC',
+    network: input.network || 'arc-testnet',
+    merchantAddress: getAddress(input.merchantAddress),
+    memo: input.memo,
+    expiresInMinutes: input.expiresInMinutes || 15,
+  })
+  return paymentInvoiceSummary(invoice)
+}
+
+export async function getPaymentRequest(input = {}) {
+  const invoiceId = String(input.invoiceId || '')
+  if (!invoiceId) throw new Error('invoiceId is required.')
+  return paymentInvoiceSummary(await backendGet(`/api/invoices/${encodeURIComponent(invoiceId)}`))
+}
+
+export async function quotePaymentRequest(input = {}) {
+  const invoice = await getPaymentRequest(input)
+  assertPayableInvoice(invoice)
+  const { account } = wallet()
+  const balance = await publicClient.readContract({ address: ARC_USDC, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }).catch(() => 0n)
+  const amountUnits = parseUnits(invoice.amount, 6)
+  return {
+    ...invoice,
+    payerAddress: account.address,
+    payerUsdcBalance: formatUnits(balance, 6),
+    supported: balance >= amountUnits,
+    requiresUserConfirmation: true,
+    feePolicy: 'No hidden ARCOX Pay invoice fee. Agent sends invoice amount directly to merchant address.',
+    userMustCheck: [
+      'Invoice id is correct.',
+      'Merchant address is correct.',
+      'Amount and token are correct.',
+      'This action moves funds and cannot be reversed after execution.',
+    ],
+  }
+}
+
+export async function payPaymentRequest(input = {}) {
+  if (input.confirmed !== true) return quotePaymentRequest(input)
+  if (input.mcpPreviewVerified !== true) throw new Error('MCP preview verification required before invoice payment.')
+  const invoice = await getPaymentRequest(input)
+  assertPayableInvoice(invoice)
+  if (input.amount && String(input.amount) !== String(invoice.amount)) throw new Error('Invoice amount changed after quote.')
+  if (input.token && normalizeArcTokenKey(input.token) !== invoice.token) throw new Error('Invoice token changed after quote.')
+  if (input.merchantAddress && getAddress(input.merchantAddress) !== invoice.merchantAddress) throw new Error('Invoice merchantAddress changed after quote.')
+  const { account, walletClient } = wallet()
+  const amountUnits = parseUnits(invoice.amount, 6)
+  const balance = await publicClient.readContract({ address: ARC_USDC, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }).catch(() => 0n)
+  if (balance < amountUnits) throw new Error('Insufficient USDC balance for invoice payment.')
+  const txHash = await walletClient.writeContract({
+    address: ARC_USDC,
+    abi: erc20Abi,
+    functionName: 'transfer',
+    args: [getAddress(invoice.merchantAddress), amountUnits],
+  })
+  await patchJson(`/api/invoices/${encodeURIComponent(invoice.invoiceId)}`, { status: 'pending', txHash, payerAddress: account.address })
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 30_000 }).catch(() => null)
+  const finalInvoice = receipt?.status === 'success'
+    ? await postJson(`/api/invoices/${encodeURIComponent(invoice.invoiceId)}/mark-paid`, { txHash, payerAddress: account.address })
+    : await getPaymentRequest({ invoiceId: invoice.invoiceId })
+  const rec = recordAgentHistory({
+    action: 'send',
+    from: account.address,
+    to: invoice.merchantAddress,
+    amount: invoice.amount,
+    token: invoice.token,
+    status: receipt?.status === 'success' ? 'success' : 'pending',
+    walletSource: 'eoa',
+    tx: txHash,
+    explorer: `${EXPLORER_TX}${txHash}`,
+    note: `ARCOX Pay invoice ${invoice.invoiceId} paid by MCP agent.`,
+  }, account.address)
+  await pushBackendHistory(account.address, rec)
+  return {
+    status: receipt?.status === 'success' ? 'paid' : 'pending',
+    invoice: paymentInvoiceSummary(finalInvoice),
+    txHash,
+    explorer: `${EXPLORER_TX}${txHash}`,
+  }
+}
+
+export async function checkPaymentStatus(input = {}) {
+  const invoiceId = String(input.invoiceId || '')
+  if (!invoiceId) throw new Error('invoiceId is required.')
+  return backendGet(`/api/invoices/${encodeURIComponent(invoiceId)}/status`)
+}
+
+export async function simulateCircleWebhook(input = {}) {
+  return postJson('/api/dev/simulate-webhook', input)
+}
+
+export async function quoteEcoRoutePayment(input = {}) {
+  return postJson('/api/eco/route-preview', input)
 }
 
 function readAutoMintStatuses() {

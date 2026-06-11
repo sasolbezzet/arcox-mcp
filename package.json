@@ -1,9 +1,9 @@
 {
   "name": "arcox-mcp",
   "private": false,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
-  "description": "ARCOX DEX MCP server and terminal agent for retail swap, bridge, send, balances, history, retry bridge, and agentic jobs.",
+  "description": "ARCOX DEX MCP server and terminal agent for retail swap, bridge, send, ARCOX Pay invoices, balances, history, retry bridge, and agentic jobs.",
   "license": "MIT",
   "homepage": "https://arc-dex-bice.vercel.app/?page=docs",
   "repository": {

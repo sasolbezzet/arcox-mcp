@@ -7,20 +7,27 @@ import { homedir } from 'node:os'
 import { actions, ARCOX_API_URL, ARCOX_WEB_URL, chainSupport, pages, retailRules } from './registry.mjs'
 import {
   agentStatus,
+  checkPaymentStatus,
   completeAgentJob,
   createAgentJob,
+  createPaymentRequest,
   executeConfirmedBridge,
   executeConfirmedSend,
   executeConfirmedSwap,
   fundAgentJob,
+  getPaymentRequest,
   makeAgentResponse,
+  payPaymentRequest,
   quoteBridge,
+  quoteEcoRoutePayment,
+  quotePaymentRequest,
   quoteSend,
   quoteSwap,
   readAgent,
   readJob,
   registerAgentIdentity,
   setAgentJobBudget,
+  simulateCircleWebhook,
   submitAgentJob,
   transactionHistory,
   walletBalances,
@@ -173,6 +180,103 @@ const tools = [
     name: 'arcox_transaction_history',
     description: 'Return ARCOX transaction history recorded by the MCP/terminal agent for bridge, swap, and send.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'arcox_create_payment_request',
+    description: 'Create an ARCOX Pay USDC invoice/payment request on Arc Testnet.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'string' },
+        token: { type: 'string', default: 'USDC' },
+        merchantAddress: { type: 'string' },
+        orderId: { type: 'string' },
+        memo: { type: 'string' },
+        expiresInMinutes: { type: 'number', default: 15 },
+      },
+      required: ['amount', 'merchantAddress'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'arcox_get_payment_request',
+    description: 'Read a full ARCOX Pay invoice/payment request.',
+    inputSchema: {
+      type: 'object',
+      properties: { invoiceId: { type: 'string' } },
+      required: ['invoiceId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'arcox_quote_payment_request',
+    description: 'Quote an ARCOX Pay invoice before payment execution. This is required before arcox_pay_payment_request.',
+    inputSchema: {
+      type: 'object',
+      properties: { invoiceId: { type: 'string' } },
+      required: ['invoiceId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'arcox_pay_payment_request',
+    description: 'Pay a quoted ARCOX Pay invoice with the local AGENT_PRIVATE_KEY signer. Requires previewId from arcox_quote_payment_request and explicit user confirmation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string' },
+        amount: { type: 'string' },
+        token: { type: 'string' },
+        merchantAddress: { type: 'string' },
+        previewId: { type: 'string' },
+        confirmationText: { type: 'string' },
+        confirmed: { type: 'boolean' },
+      },
+      required: ['invoiceId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'arcox_check_payment_status',
+    description: 'Check ARCOX Pay invoice status, tx hash, paidAt, and timeline.',
+    inputSchema: {
+      type: 'object',
+      properties: { invoiceId: { type: 'string' } },
+      required: ['invoiceId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'arcox_simulate_circle_webhook',
+    description: 'Dev-only ARCOX Pay Circle Gateway webhook simulator. Requires ENABLE_DEV_TOOLS=true on backend.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string' },
+        eventType: { type: 'string' },
+        txHash: { type: 'string' },
+      },
+      required: ['invoiceId', 'eventType'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'arcox_quote_eco_route_payment',
+    description: 'Preview a future Eco route for cross-chain stablecoin invoice payment. Returns mockMode=true when Eco credentials are missing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sourceChain: { type: 'string' },
+        destinationChain: { type: 'string', default: 'arc-testnet' },
+        sourceToken: { type: 'string', default: 'USDC' },
+        destinationToken: { type: 'string', default: 'USDC' },
+        amount: { type: 'string' },
+        recipient: { type: 'string' },
+        invoiceId: { type: 'string' },
+      },
+      required: ['sourceChain', 'amount', 'recipient'],
+      additionalProperties: false,
+    },
   },
   {
     name: 'arcox_quote_swap',
@@ -346,7 +450,7 @@ async function agentJob(args) {
   throw new Error(`Unsupported agent job operation: ${args.operation}`)
 }
 
-const valueMovingTools = new Set(['arcox_execute_bridge', 'arcox_execute_send', 'arcox_execute_swap'])
+const valueMovingTools = new Set(['arcox_execute_bridge', 'arcox_execute_send', 'arcox_execute_swap', 'arcox_pay_payment_request'])
 const valueMovingJobOps = new Set(['register-agent', 'create-job', 'set-budget', 'fund', 'submit', 'complete'])
 const rateLimitBuckets = new Map()
 const RATE_LIMIT_WINDOW_MS = 60_000
@@ -385,6 +489,7 @@ function stableJson(value) {
 function spendAmountFor(name, args) {
   if (name.includes('swap')) return Number(args.amountIn || args.amount || 0)
   if (name.includes('send') || name.includes('bridge')) return Number(args.amount || 0)
+  if (name === 'arcox_pay_payment_request') return Number(args.amount || 0)
   if (name === 'arcox_agent_job') return Number(args.amount || 0)
   return 0
 }
@@ -416,6 +521,7 @@ function canonicalSource(value, fallback = 'eoa') {
 }
 
 function canonicalPreviewAction(name) {
+  if (name === 'arcox_quote_payment_request') return 'arcox_pay_payment_request'
   return name.replace('quote', 'execute')
 }
 
@@ -448,6 +554,15 @@ function canonicalPreviewArgs(name, args) {
       amountIn: canonicalAmount(args.amountIn || args.amount),
     }
   }
+  if (action === 'arcox_pay_payment_request') {
+    return {
+      action,
+      invoiceId: String(args.invoiceId || ''),
+      amount: canonicalAmount(args.amount),
+      token: canonicalToken(args.token),
+      merchantAddress: String(args.merchantAddress || '').toLowerCase(),
+    }
+  }
   return { action, ...args }
 }
 
@@ -470,6 +585,7 @@ function attachPreview(name, args, quote) {
     ...quote,
     previewId,
     previewExpiresAt: new Date(Date.now() + PREVIEW_TTL_MS).toISOString(),
+    previewArgs: canonical,
     dryRunRequired: true,
     safetyLimits: {
       maxTxUsdc: MAX_TX_USDC,
@@ -605,6 +721,34 @@ async function rpcResponse(message) {
       return result(id, await runValueMovingTool(name, args, () => executeConfirmedSwap({ ...args, mcpPreviewVerified: true })))
     }
     if (name === 'arcox_transaction_history') return result(id, await transactionHistory())
+    if (name === 'arcox_create_payment_request') return result(id, await createPaymentRequest(args))
+    if (name === 'arcox_get_payment_request') return result(id, await getPaymentRequest(args))
+    if (name === 'arcox_quote_payment_request') {
+      const quote = await quotePaymentRequest(args)
+      return result(id, attachPreview(name, {
+        invoiceId: quote.invoiceId,
+        amount: quote.amount,
+        token: quote.token,
+        merchantAddress: quote.merchantAddress,
+      }, quote))
+    }
+    if (name === 'arcox_pay_payment_request' && args.confirmed !== true) {
+      const quote = await quotePaymentRequest(args)
+      return result(id, attachPreview('arcox_quote_payment_request', {
+        invoiceId: quote.invoiceId,
+        amount: quote.amount,
+        token: quote.token,
+        merchantAddress: quote.merchantAddress,
+      }, quote))
+    }
+    if (name === 'arcox_pay_payment_request') {
+      enforcePreview(name, args)
+      enforceSpendLimits(name, args)
+      return result(id, await runValueMovingTool(name, args, () => payPaymentRequest({ ...args, mcpPreviewVerified: true })))
+    }
+    if (name === 'arcox_check_payment_status') return result(id, await checkPaymentStatus(args))
+    if (name === 'arcox_simulate_circle_webhook') return result(id, await simulateCircleWebhook(args))
+    if (name === 'arcox_quote_eco_route_payment') return result(id, await quoteEcoRoutePayment(args))
     if (name === 'arcox_agent_job') {
       if (isValueMovingCall(name, args)) enforceSpendLimits(name, args)
       return result(id, await agentJob(args))
