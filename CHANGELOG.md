@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+- Add Dynamic-style documentation discovery tools: `arcox_search_docs` and `arcox_read_doc`.
+- Document Circle Gateway Nanopayments/x402 readiness as future settlement, not a live gas-free payment claim.
+
 ## 0.1.3
 
 - Add local `.env` permission warnings to `arcox-agent status`.

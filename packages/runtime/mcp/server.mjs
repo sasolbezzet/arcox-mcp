@@ -62,9 +62,69 @@ const resources = [
   { uri: 'arcox://ui/chains', name: 'ARCOX Chain Support', mimeType: 'application/json' },
   { uri: 'arcox://rules/retail-safety', name: 'Retail Safety Rules', mimeType: 'application/json' },
   { uri: 'arcox://deployments/router', name: 'Arcox Router Deployments', mimeType: 'application/json' },
+  { uri: 'arcox://docs/catalog', name: 'ARCOX Docs Catalog', mimeType: 'application/json' },
+]
+
+const docsCatalog = [
+  {
+    id: 'overview',
+    title: 'ARCOX Overview',
+    tags: ['dex', 'arc', 'wallet', 'retail'],
+    body: 'ARCOX DEX is a retail Arc Testnet app for swap, bridge, send, receive/payment request, ARCOX Pay invoices, transaction history, and agent workflows. Value-moving actions must quote before execution.',
+  },
+  {
+    id: 'pay',
+    title: 'ARCOX Pay',
+    tags: ['pay', 'invoice', 'payment request', 'usdc'],
+    body: 'ARCOX Pay creates public USDC invoice/payment links on Arc Testnet. It is not private payment and does not charge hidden merchant fees. Invoice payment requires preview and confirmation.',
+  },
+  {
+    id: 'circle-nanopayments',
+    title: 'Circle Gateway Nanopayments Readiness',
+    tags: ['circle', 'gateway', 'nanopayments', 'x402', 'eip-3009'],
+    body: 'Circle Gateway Nanopayments use x402: paid resource request, HTTP 402 response, buyer offchain EIP-3009 authorization, retry with proof, and batched Gateway settlement. ARCOX exposes readiness metadata only; gas-free nanopayments settlement is not live yet.',
+  },
+  {
+    id: 'mcp-safety',
+    title: 'MCP Safety Rules',
+    tags: ['mcp', 'agent', 'safety', 'confirmation'],
+    body: 'Agents must call quote tools first, show preview details to the user, receive a simple explicit confirmation, then execute with previewId and confirmationText. Bulk transactions require one quote and one confirmation per operation.',
+  },
+  {
+    id: 'bridge-retry',
+    title: 'Bridge Retry',
+    tags: ['bridge', 'retry', 'cctp', 'attestation'],
+    body: 'CCTP bridge has approve, burn, attestation, and mint/receive stages. If burn succeeded but mint is pending, check status and retry mint instead of repeating the burn.',
+  },
+  {
+    id: 'dynamic-style-docs',
+    title: 'Dynamic-style MCP Docs Discovery',
+    tags: ['dynamic', 'docs', 'search', 'mcp'],
+    body: 'Following the Dynamic MCP docs pattern, ARCOX exposes arcox_search_docs and arcox_read_doc so agents can discover product docs before choosing tools.',
+  },
 ]
 
 const tools = [
+  {
+    name: 'arcox_search_docs',
+    description: 'Search ARCOX product and MCP documentation. Use this before guessing an unfamiliar ARCOX flow.',
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'arcox_read_doc',
+    description: 'Read a structured ARCOX documentation page by id returned from arcox_search_docs.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
   {
     name: 'arcox_ui_map',
     description: 'Return the full ARCOX DEX page/action map so an agent can understand the Web UI.',
@@ -351,7 +411,38 @@ function readResource(uri) {
   if (uri === 'arcox://ui/chains') return chainSupport
   if (uri === 'arcox://rules/retail-safety') return retailRules
   if (uri === 'arcox://deployments/router') return routerDeployments()
+  if (uri === 'arcox://docs/catalog') return docsCatalog
   throw new Error(`Unknown resource: ${uri}`)
+}
+
+function searchDocs(args) {
+  const query = String(args.query || '').trim().toLowerCase()
+  const words = query.split(/\W+/).filter(Boolean)
+  const results = docsCatalog
+    .map((doc) => {
+      const haystack = [doc.id, doc.title, ...(doc.tags || []), doc.body].join(' ').toLowerCase()
+      const score = words.reduce((sum, word) => sum + (haystack.includes(word) ? 1 : 0), 0)
+      return { id: doc.id, title: doc.title, tags: doc.tags, score, snippet: doc.body.slice(0, 220) }
+    })
+    .filter((item) => item.score > 0 || !query)
+    .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
+  return {
+    query,
+    results,
+    safeNextStep: results.length
+      ? 'Call arcox_read_doc with the selected id before acting on unfamiliar flows.'
+      : 'No doc match found. Ask the user to clarify the desired ARCOX flow.',
+  }
+}
+
+function readDoc(args) {
+  const id = String(args.id || '').trim().toLowerCase()
+  const doc = docsCatalog.find((item) => item.id === id)
+  if (!doc) throw new Error(`Unknown ARCOX doc id: ${args.id}`)
+  return {
+    ...doc,
+    relatedResources: ['arcox://ui/pages', 'arcox://ui/actions', 'arcox://rules/retail-safety'],
+  }
 }
 
 function findAction(intent, pageHint) {
@@ -671,7 +762,7 @@ async function rpcResponse(message) {
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false },
         },
-        serverInfo: { name: 'arcox-mcp', version: '0.1.3' },
+        serverInfo: { name: 'arcox-mcp', version: '0.1.4' },
       },
     }
   }
@@ -681,6 +772,8 @@ async function rpcResponse(message) {
     const name = params.name
     const args = params.arguments || {}
     if (isValueMovingCall(name, args)) enforceRateLimit('local-mcp-client')
+    if (name === 'arcox_search_docs') return result(id, searchDocs(args))
+    if (name === 'arcox_read_doc') return result(id, readDoc(args))
     if (name === 'arcox_ui_map') return result(id, { webUrl: ARCOX_WEB_URL, apiUrl: ARCOX_API_URL, pages, actions, chainSupport, retailRules })
     if (name === 'arcox_action_plan') return result(id, actionPlan(args))
     if (name === 'arcox_route_status') return result(id, routeStatus(args))

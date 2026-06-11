@@ -12,6 +12,7 @@ It exposes tools for:
 - Bridge retry and transaction history
 - ARCOX Agentic Economy job actions
 - ARCOX DEX UI/action map for agents
+- Dynamic-style ARCOX docs search/read tools
 
 ## Install
 
@@ -137,8 +138,21 @@ The agent must not skip the preview step.
 - `arcox_route_status`
 - `arcox_ui_map`
 - `arcox_action_plan`
+- `arcox_search_docs`
+- `arcox_read_doc`
 - `arcox_agent_status`
 - `arcox_agent_job`
+
+## Circle Gateway Nanopayments Readiness
+
+ARCOX MCP understands Circle Gateway Nanopayments as a future x402 rail:
+
+1. API returns `402 Payment Required`.
+2. Buyer signs an offchain EIP-3009 authorization.
+3. Buyer retries with the proof.
+4. Gateway batch settlement is future work for ARCOX.
+
+Do not tell users gas-free nanopayments are live. Current ARCOX Pay invoices remain public USDC payment links on Arc Testnet.
 
 ## CLI Examples
 
