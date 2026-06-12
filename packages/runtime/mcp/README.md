@@ -5,8 +5,8 @@ Purpose: give Codex/Hermes agents a structured view of ARCOX DEX and execute sup
 Run locally:
 
 ```bash
-cd /home/ubuntu/arc-dex/arcox-agent
-npm run mcp
+cd ~/.arcox
+arcox-mcp
 ```
 
 Example MCP config:
@@ -16,7 +16,7 @@ Example MCP config:
   "mcpServers": {
     "arcox": {
       "command": "node",
-      "args": ["/home/ubuntu/arc-dex/arcox-agent/mcp/server.mjs"],
+      "args": ["/path/to/arcox-mcp/packages/runtime/mcp/server.mjs"],
       "env": {
         "ARCOX_WEB_URL": "https://arc-dex-bice.vercel.app/",
         "ARCOX_API_URL": "https://43.163.98.128.nip.io"
@@ -45,8 +45,10 @@ Tools:
 - `arcox_retry_bridge`: retries CCTP mint for a pending bridge burn. Without `confirmed: true`, it returns a preview only.
 - `arcox_quote_send`: quotes an Arc token send and platform fee.
 - `arcox_execute_send`: executes a confirmed Arc token send. Without `confirmed: true`, it returns a quote only.
-- `arcox_quote_swap`: quotes a Circle proxy wallet swap through the ARCOX backend.
-- `arcox_execute_swap`: executes a confirmed Circle proxy wallet swap. Without `confirmed: true`, it returns a quote only.
+- `arcox_quote_swap`: quotes an Arc swap. Default source is the local EOA agent wallet; use `source="circle"` only when the user explicitly asks for Circle proxy wallet.
+- `arcox_execute_swap`: executes a confirmed Arc swap. EOA uses local `AGENT_PRIVATE_KEY` to sign approve and Circle AppKit adapter execute transactions. Without `confirmed: true`, it returns a quote only.
+- `arcox_create_payment_request`: creates an ARCOX Pay public USDC invoice/payment link on Arc Testnet.
+- `arcox_get_payment_request`, `arcox_quote_payment_request`, `arcox_pay_payment_request`, `arcox_check_payment_status`: read, quote, pay, and track ARCOX Pay invoices.
 - `arcox_agent_job`: plans and executes Agentic Economy operations: register agent, create/read job, set budget, fund, submit, and complete.
 
 Execution safety:
@@ -54,5 +56,6 @@ Execution safety:
 - Value-moving tools must be called first as quote/preview.
 - Execute tools only submit transactions when `confirmed: true`.
 - EOA execution uses the local `AGENT_PRIVATE_KEY` in `arcox-agent/.env`.
-- Circle proxy wallet swap uses the ARCOX backend auth session signed by the local agent key.
+- Circle proxy wallet actions use the ARCOX backend auth session signed by the local agent key and must be explicitly requested with `source="circle"`.
+- Circle for Agents/x402 support is readiness only. ARCOX Pay invoices are public USDC payment links, not live gas-free nanopayments.
 - Browser-wallet signing from the Web UI remains separate from terminal/MCP execution.

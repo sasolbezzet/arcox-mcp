@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5
+
+- Align MCP docs with Circle for Agents: USDC-native agent workflows, paid API/x402 readiness, and no live gas-free nanopayments claim.
+- Make MCP swap default to EOA agent wallet instead of Circle proxy wallet.
+- Add EOA swap execution through ARCOX backend `/api/eoa-swap-prepare` plus local `AGENT_PRIVATE_KEY` approve/adapter execute signing.
+- Keep Circle proxy swap available only when `source="circle"` is explicitly quoted and confirmed.
+- Document ARCOX Pay invoice/payment request MCP tools for create, quote, pay, and status.
+
 ## 0.1.4
 
 - Add Dynamic-style documentation discovery tools: `arcox_search_docs` and `arcox_read_doc`.

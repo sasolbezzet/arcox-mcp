@@ -85,6 +85,12 @@ const docsCatalog = [
     body: 'Circle Gateway Nanopayments use x402: paid resource request, HTTP 402 response, buyer offchain EIP-3009 authorization, retry with proof, and batched Gateway settlement. ARCOX exposes readiness metadata only; gas-free nanopayments settlement is not live yet.',
   },
   {
+    id: 'circle-agents',
+    title: 'Circle for Agents Alignment',
+    tags: ['circle', 'agents', 'x402', 'paid api', 'usdc'],
+    body: 'Circle for Agents positions USDC as payment-as-authentication for agents and paid APIs. ARCOX aligns by exposing quote-before-execute MCP tools, ARCOX Pay invoice/payment request tools, and x402/nanopayments readiness metadata. Current ARCOX execution remains public Arc Testnet USDC and does not claim live gas-free nanopayments.',
+  },
+  {
     id: 'mcp-safety',
     title: 'MCP Safety Rules',
     tags: ['mcp', 'agent', 'safety', 'confirmation'],
@@ -340,13 +346,14 @@ const tools = [
   },
   {
     name: 'arcox_quote_swap',
-    description: 'Quote a Circle proxy wallet swap through the ARCOX backend.',
+    description: 'Quote an Arc swap. Default source is EOA agent wallet; set source="circle" only when the user explicitly asks to use the Circle proxy wallet.',
     inputSchema: {
       type: 'object',
       properties: {
         tokenIn: { type: 'string' },
         tokenOut: { type: 'string' },
         amountIn: { type: 'string' },
+        source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
       },
       required: ['tokenIn', 'tokenOut', 'amountIn'],
       additionalProperties: false,
@@ -354,13 +361,14 @@ const tools = [
   },
   {
     name: 'arcox_execute_swap',
-    description: 'Execute a confirmed Circle proxy wallet swap through the ARCOX backend. Requires previewId from arcox_quote_swap when confirmed=true.',
+    description: 'Execute a confirmed Arc swap. Default source is EOA agent wallet signed by local AGENT_PRIVATE_KEY. Set source="circle" only when explicitly quoted for Circle proxy wallet. Requires previewId from arcox_quote_swap when confirmed=true.',
     inputSchema: {
       type: 'object',
       properties: {
         tokenIn: { type: 'string' },
         tokenOut: { type: 'string' },
         amountIn: { type: 'string' },
+        source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
         previewId: { type: 'string' },
         confirmed: { type: 'boolean' },
         confirmationText: { type: 'string' },
@@ -643,6 +651,7 @@ function canonicalPreviewArgs(name, args) {
       tokenIn: canonicalToken(args.tokenIn),
       tokenOut: canonicalToken(args.tokenOut, ''),
       amountIn: canonicalAmount(args.amountIn || args.amount),
+      source: canonicalSource(args.source),
     }
   }
   if (action === 'arcox_pay_payment_request') {
@@ -762,7 +771,7 @@ async function rpcResponse(message) {
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false },
         },
-        serverInfo: { name: 'arcox-mcp', version: '0.1.4' },
+        serverInfo: { name: 'arcox-mcp', version: '0.1.5' },
       },
     }
   }

@@ -5,7 +5,7 @@ ARCOX MCP is a local MCP server and terminal agent for ARCOX DEX retail flows.
 It exposes tools for:
 
 - Wallet balances across EOA, Circle proxy wallet, and Solana Devnet
-- Swap quote and execution
+- Swap quote and execution from the local EOA agent wallet by default, with optional Circle proxy wallet source
 - Bridge quote and execution
 - Send quote and execution
 - ARCOX Pay invoice/payment request tools
@@ -13,6 +13,17 @@ It exposes tools for:
 - ARCOX Agentic Economy job actions
 - ARCOX DEX UI/action map for agents
 - Dynamic-style ARCOX docs search/read tools
+
+## Circle Agents Alignment
+
+ARCOX MCP follows the Circle for Agents direction: USDC-native agent workflows, paid API readiness, and quote-before-execute safety. Current support is:
+
+- EOA agent wallet swap/send/bridge/payment using the user's local `AGENT_PRIVATE_KEY`.
+- Circle proxy wallet support only when a tool is explicitly called with `source="circle"`.
+- ARCOX Pay invoice/payment request tools for public USDC payment links on Arc Testnet.
+- x402/Circle Gateway Nanopayments readiness docs and metadata only.
+
+ARCOX does not claim live gas-free nanopayments or private payments. Those remain future integration work.
 
 ## Install
 
@@ -159,6 +170,7 @@ Do not tell users gas-free nanopayments are live. Current ARCOX Pay invoices rem
 ```bash
 arcox-agent status
 arcox-agent "show all wallet balances"
+arcox-agent "quote swap 1 eurc to usdc from eoa"
 arcox-agent "quote bridge 1 usdc from arc to base"
 arcox-agent "send 1 eurc from eoa to 0x..."
 arcox-agent "create payment request 10 usdc to 0xMerchant for AI agent setup"
@@ -169,6 +181,8 @@ arcox-agent "retry bridge 0xBURN_TX from arbitrum sepolia to arc"
 For execution, inspect the preview first and then confirm.
 
 ARCOX Pay invoice payment uses quote-before-execute. The execute call must pass the quoted `previewId` and the same invoice amount, token, and merchant address from `previewArgs`.
+
+Swap uses EOA by default. To use the Circle proxy wallet, the tool call must explicitly include `source="circle"` in both quote and execute.
 
 ## Security
 

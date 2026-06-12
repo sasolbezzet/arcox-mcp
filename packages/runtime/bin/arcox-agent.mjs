@@ -18,6 +18,7 @@ import {
   keccak256,
   parseUnits,
   toHex,
+  encodeFunctionData,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import bs58 from 'bs58'
@@ -73,6 +74,7 @@ const SEND_ESTIMATE_TIMEOUT_MS = Number(process.env.SEND_ESTIMATE_TIMEOUT_MS || 
 const RPC_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || '8000')
 const SOLANA_CONFIRM_TIMEOUT_MS = Number(process.env.SOLANA_CONFIRM_TIMEOUT_MS || '45000')
 const PLATFORM_FEE_BPS = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
+const ARC_APPKIT_ADAPTER = '0xBBD70b01a1CAbc96d5b7b129Ae1AAabdf50dd40b'
 const SOLANA_FEE_TREASURY = process.env.SOLANA_FEE_TREASURY || '4kAf2Qxf9KnbnKo7ukPMMu8q1UButJYNik4yQtvWhExw'
 const AUTO_MINT_DIR = join(AGENT_HOME, '.arcox-auto-mint')
 const TX_HISTORY_FILE = join(AGENT_HOME, '.arcox-agent-history.json')
@@ -84,6 +86,58 @@ const ARC_TOKENS = {
   USYC: { address: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C', decimals: 6 },
   CIRBTC: { address: '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF', decimals: 8 },
 }
+
+const adapterExecuteAbi = [
+  {
+    type: 'function',
+    name: 'execute',
+    stateMutability: 'payable',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        components: [
+          {
+            name: 'instructions',
+            type: 'tuple[]',
+            components: [
+              { name: 'target', type: 'address' },
+              { name: 'data', type: 'bytes' },
+              { name: 'value', type: 'uint256' },
+              { name: 'tokenIn', type: 'address' },
+              { name: 'amountToApprove', type: 'uint256' },
+              { name: 'tokenOut', type: 'address' },
+              { name: 'minTokenOut', type: 'uint256' },
+            ],
+          },
+          {
+            name: 'tokens',
+            type: 'tuple[]',
+            components: [
+              { name: 'token', type: 'address' },
+              { name: 'beneficiary', type: 'address' },
+            ],
+          },
+          { name: 'execId', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+          { name: 'metadata', type: 'bytes' },
+        ],
+      },
+      {
+        name: 'tokenInputs',
+        type: 'tuple[]',
+        components: [
+          { name: 'permitType', type: 'uint8' },
+          { name: 'token', type: 'address' },
+          { name: 'amount', type: 'uint256' },
+          { name: 'permitCalldata', type: 'bytes' },
+        ],
+      },
+      { name: 'signature', type: 'bytes' },
+    ],
+    outputs: [],
+  },
+]
 
 const arcTestnet = defineChain({
   id: 5042002,
@@ -1728,6 +1782,7 @@ export async function executeSwap(intent, owner) {
   const tokenOut = normalizeArcTokenKey(intent.tokenOut || '', '')
   const apiTokenIn = apiArcTokenKey(tokenIn)
   const apiTokenOut = apiArcTokenKey(tokenOut, '')
+  const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   if (!intent.amount || Number(intent.amount) <= 0) throw new Error('Swap command needs amount, example: swap 10 USDC to EURC')
   if (!ARC_TOKENS[tokenIn]) throw new Error(`Unsupported swap input token: ${tokenIn}`)
   if (!ARC_TOKENS[tokenOut]) throw new Error('Swap command needs output token, example: swap 10 USDC to EURC')
@@ -1735,10 +1790,15 @@ export async function executeSwap(intent, owner) {
 
   const account = privateKeyToAccount(privateKey())
   const token = await backendSession(account)
-  const walletData = await postJson('/api/wallet', { metamaskAddress: owner }, token)
+  const walletData = source === 'circle' ? await postJson('/api/wallet', { metamaskAddress: owner }, token) : null
   let quote
   try {
-    quote = await postJson('/api/quote', { metamaskAddress: owner, tokenIn: apiTokenIn, tokenOut: apiTokenOut, amountIn: intent.amount }, token)
+    quote = await postJson(source === 'circle' ? '/api/quote' : '/api/eoa-swap-quote', {
+      metamaskAddress: owner,
+      tokenIn: apiTokenIn,
+      tokenOut: apiTokenOut,
+      amountIn: intent.amount,
+    }, token)
   } catch (error) {
     quote = swapRouteUnavailableQuote(error)
     if (!quote) throw error
@@ -1747,14 +1807,15 @@ export async function executeSwap(intent, owner) {
     return {
       status: 'route_unavailable',
       action: 'swap',
-      source: 'circle-wallet-proxy',
+      source: source === 'circle' ? 'circle-wallet-proxy' : 'eoa-agent-wallet',
       owner,
       tokenIn,
       tokenOut,
-      wallet: walletData.wallet,
+      wallet: walletData?.wallet,
       quote,
     }
   }
+  if (source === 'eoa') return executeEoaPreparedSwap({ owner, tokenIn, tokenOut, apiTokenIn, apiTokenOut, amount: intent.amount, quote, authToken: token })
   let swap
   try {
     swap = await withTimeout(
@@ -1787,6 +1848,112 @@ export async function executeSwap(intent, owner) {
     quote,
     result: swap.result,
     note: 'Circle wallet swap is executed by backend proxy wallet after local agent signs ARCOX login message.',
+  }
+}
+
+async function executeEoaPreparedSwap({ owner, tokenIn, tokenOut, apiTokenIn, apiTokenOut, amount, quote, authToken }) {
+  const { walletClient } = wallet()
+  const prepared = await postJson('/api/eoa-swap-prepare', {
+    metamaskAddress: owner,
+    tokenIn: apiTokenIn,
+    tokenOut: apiTokenOut,
+    amountIn: amount,
+  }, authToken, SWAP_EXECUTION_TIMEOUT_MS)
+  const adapterContract = getAddress(prepared.adapterContract || ARC_APPKIT_ADAPTER)
+  const tokenInAddress = getAddress(prepared.tokenInAddress || ARC_TOKENS[tokenIn].address)
+  const amountBaseUnits = BigInt(prepared.amountBaseUnits)
+  const approveTx = await walletClient.writeContract({
+    address: tokenInAddress,
+    abi: erc20Abi,
+    functionName: 'approve',
+    args: [adapterContract, amountBaseUnits],
+  })
+  await publicClient.waitForTransactionReceipt({ hash: approveTx })
+  const executionParams = normalizeAdapterExecutionParams(prepared.executionParams)
+  const tokenInputs = [{
+    permitType: 0,
+    token: tokenInAddress,
+    amount: amountBaseUnits,
+    permitCalldata: '0x',
+  }]
+  const data = encodeFunctionData({
+    abi: adapterExecuteAbi,
+    functionName: 'execute',
+    args: [executionParams, tokenInputs, prepared.signature],
+  })
+  const gas = prepared.gasLimit ? (BigInt(prepared.gasLimit) * 120n) / 100n : undefined
+  const swapTx = await walletClient.sendTransaction({
+    to: adapterContract,
+    data,
+    ...(gas ? { gas } : {}),
+  })
+  await publicClient.waitForTransactionReceipt({ hash: swapTx })
+  let feeTx = ''
+  let platformFeeError = ''
+  const feeAmount = String(prepared.platformFee?.amount || '0')
+  const feeUnits = parseUnits(feeAmount, ARC_TOKENS[tokenIn].decimals)
+  if (feeUnits > 0n) {
+    try {
+      feeTx = await walletClient.writeContract({
+        address: tokenInAddress,
+        abi: erc20Abi,
+        functionName: 'transfer',
+        args: [getAddress(prepared.platformFee?.treasury || process.env.ARCOX_FEE_TREASURY || owner), feeUnits],
+      })
+      await publicClient.waitForTransactionReceipt({ hash: feeTx })
+    } catch (error) {
+      platformFeeError = error.message
+    }
+  }
+  return {
+    status: 'submitted',
+    action: 'swap',
+    source: 'eoa-agent-wallet',
+    route: 'circle-stablecoin-service-adapter',
+    owner,
+    tokenIn,
+    tokenOut,
+    quote,
+    approveTx,
+    result: {
+      txHash: swapTx,
+      transactionHash: swapTx,
+      explorerUrl: EXPLORER_TX + swapTx,
+      tokenIn,
+      tokenOut,
+      amountIn: prepared.amountIn,
+      amountOut: prepared.amountOut,
+      grossAmountIn: prepared.grossAmountIn,
+      platformFee: {
+        ...prepared.platformFee,
+        txHash: feeTx || undefined,
+        error: platformFeeError || undefined,
+      },
+    },
+    note: platformFeeError
+      ? `EOA swap executed through Circle Stablecoin Service adapter, but platform fee transfer failed: ${platformFeeError}`
+      : 'EOA swap executed through Circle Stablecoin Service adapter with local AGENT_PRIVATE_KEY signer.',
+  }
+}
+
+function normalizeAdapterExecutionParams(params = {}) {
+  return {
+    instructions: (params.instructions || []).map(item => ({
+      target: getAddress(item.target),
+      data: item.data,
+      value: BigInt(item.value),
+      tokenIn: getAddress(item.tokenIn),
+      amountToApprove: BigInt(item.amountToApprove),
+      tokenOut: getAddress(item.tokenOut),
+      minTokenOut: BigInt(item.minTokenOut),
+    })),
+    tokens: (params.tokens || []).map(item => ({
+      token: getAddress(item.token),
+      beneficiary: getAddress(item.beneficiary),
+    })),
+    execId: BigInt(params.execId),
+    deadline: BigInt(params.deadline),
+    metadata: params.metadata || '0x',
   }
 }
 
@@ -2190,6 +2357,7 @@ export async function quoteSwap(intent) {
   const apiTokenIn = apiArcTokenKey(tokenIn)
   const apiTokenOut = apiArcTokenKey(tokenOut, '')
   const amountIn = String(intent.amountIn || intent.amount || '')
+  const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   if (!amountIn) throw new Error('Swap quote needs amountIn.')
   if (!ARC_TOKENS[tokenIn]) throw new Error(`Unsupported swap input token: ${tokenIn}`)
   if (!ARC_TOKENS[tokenOut]) throw new Error(`Unsupported swap output token: ${tokenOut}`)
@@ -2197,7 +2365,12 @@ export async function quoteSwap(intent) {
   const token = await backendSession(account)
   let quote
   try {
-    quote = await postJson('/api/quote', { metamaskAddress: account.address, tokenIn: apiTokenIn, tokenOut: apiTokenOut, amountIn }, token)
+    quote = await postJson(source === 'circle' ? '/api/quote' : '/api/eoa-swap-quote', {
+      metamaskAddress: account.address,
+      tokenIn: apiTokenIn,
+      tokenOut: apiTokenOut,
+      amountIn,
+    }, token)
   } catch (error) {
     quote = swapRouteUnavailableQuote(error)
     if (!quote) throw error
@@ -2205,7 +2378,10 @@ export async function quoteSwap(intent) {
   return {
     status: 'quote',
     action: 'swap',
-    source: 'circle-wallet-proxy',
+    source: source === 'circle' ? 'circle-wallet-proxy' : 'eoa-agent-wallet',
+    terminalExecution: source === 'eoa'
+      ? 'Local AGENT_PRIVATE_KEY signs approve and Circle AppKit adapter execute transactions.'
+      : 'ARCOX backend executes from the Circle proxy wallet after local login signature.',
     owner: account.address,
     tokenIn,
     tokenOut,
@@ -2320,9 +2496,11 @@ export async function executeConfirmedSwap(intent) {
   if (intent.confirmed !== true) return quoteSwap(intent)
   if (intent.mcpPreviewVerified !== true) throw new Error('MCP preview verification required before swap execution.')
   const { account } = wallet()
+  const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   const result = await executeSwap({
     ...intent,
     amount: String(intent.amountIn || intent.amount),
+    source,
     tokenIn: String(intent.tokenIn || 'USDC').toUpperCase() === 'CIRBTC' ? 'CIRBTC' : String(intent.tokenIn || 'USDC').toUpperCase(),
     tokenOut: String(intent.tokenOut || '').toUpperCase() === 'CIRBTC' ? 'CIRBTC' : String(intent.tokenOut || '').toUpperCase(),
   }, account.address)
@@ -2333,11 +2511,12 @@ export async function executeConfirmedSwap(intent) {
     amount: String(intent.amountIn || intent.amount),
     token: result.result?.tokenIn || intent.tokenIn || 'USDC',
     status: result.status === 'submitted' ? 'success' : 'pending',
-    walletSource: 'circle',
+    walletSource: source,
+    approveTx: result.approveTx,
     tx: result.result?.txHash || result.result?.transactionHash,
     explorer: result.result?.explorerUrl,
     note: result.status === 'submitted'
-      ? 'Swap executed from Circle Wallet proxy by MCP agent.'
+      ? (source === 'circle' ? 'Swap executed from Circle Wallet proxy by MCP agent.' : 'Swap executed from EOA agent wallet by MCP agent.')
       : result.safeNextStep || result.error || 'Swap backend did not return a final transaction.',
   }, account.address)
   await pushBackendHistory(account.address, rec)
