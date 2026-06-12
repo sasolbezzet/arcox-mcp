@@ -6,7 +6,7 @@ It exposes tools for:
 
 - Wallet balances across EOA, Circle proxy wallet, and Solana Devnet
 - Swap quote and execution from the local EOA agent wallet by default, with optional Circle proxy wallet source
-- Bridge quote and execution
+- Bridge quote and execution, including native ETH to Arc on verified Ethereum/Base Sepolia routers
 - Send quote and execution
 - ARCOX Pay invoice/payment request tools
 - Bridge retry and transaction history
@@ -67,7 +67,17 @@ Optional safety limits:
 ```bash
 ARCOX_MAX_TX_USDC=10
 ARCOX_DAILY_LIMIT_USDC=50
+ARCOX_MAX_TX_NATIVE=0.1
 ```
+
+Native bridge examples:
+
+```bash
+bridge 0.001 ETH from Base Sepolia to Arc
+bridge 0.001 ETH from Ethereum Sepolia to Arc
+```
+
+Native bridge uses the local EOA agent wallet only. Circle Wallet source supports USDC bridge routes, not native ETH.
 
 When installed globally, run commands from `~/.arcox` so the local `.env` file is loaded:
 

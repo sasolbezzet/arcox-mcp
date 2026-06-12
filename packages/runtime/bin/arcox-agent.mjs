@@ -10,6 +10,7 @@ import {
   createPublicClient,
   createWalletClient,
   decodeEventLog,
+  decodeFunctionResult,
   defineChain,
   erc20Abi,
   formatUnits,
@@ -153,6 +154,7 @@ function rpcTransport(rpcUrl) {
 
 const publicClient = createPublicClient({ chain: arcTestnet, transport: rpcTransport(ARC_RPC) })
 const routerDeployments = loadRouterDeployments()
+const nativeSwapBridgeDeployments = loadNativeSwapBridgeDeployments()
 
 function readAgentHistory() {
   try {
@@ -427,6 +429,29 @@ const arcoxRouterAbi = [
   },
 ]
 
+const nativeSwapBridgeRouterAbi = [
+  {
+    type: 'function',
+    name: 'swapNativeAndBridgeUsdc',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'destinationDomain', type: 'uint32' },
+      { name: 'mintRecipient', type: 'bytes32' },
+      { name: 'destinationCaller', type: 'bytes32' },
+      { name: 'poolFee', type: 'uint24' },
+      { name: 'amountOutMinimum', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'maxFee', type: 'uint256' },
+      { name: 'minFinalityThreshold', type: 'uint32' },
+    ],
+    outputs: [
+      { name: 'usdcOut', type: 'uint256' },
+      { name: 'platformFee', type: 'uint256' },
+      { name: 'netUsdc', type: 'uint256' },
+    ],
+  },
+]
+
 const agenticCommerceAbi = [
   {
     type: 'function',
@@ -569,14 +594,36 @@ function loadRouterDeployments() {
   }
 }
 
+function loadNativeSwapBridgeDeployments() {
+  const path = join(AGENT_HOME, 'deployments', 'arcox-native-swap-bridge-router.testnet.json')
+  if (!existsSync(path)) return {}
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')).deployments || {}
+  } catch {
+    return {}
+  }
+}
+
 function envRouterName(chainId) {
   return `ARCOX_ROUTER_${String(chainId).toUpperCase()}`
+}
+
+function envNativeSwapBridgeRouterName(chainId) {
+  return `ARCOX_NATIVE_SWAP_BRIDGE_ROUTER_${String(chainId).toUpperCase()}`
 }
 
 export function routerFor(chainId) {
   const envValue = process.env[envRouterName(chainId)]
   if (envValue && /^0x[0-9a-fA-F]{40}$/.test(envValue)) return getAddress(envValue)
   const deployed = routerDeployments[chainId]?.address
+  if (deployed && /^0x[0-9a-fA-F]{40}$/.test(deployed)) return getAddress(deployed)
+  return ''
+}
+
+export function nativeSwapBridgeRouterFor(chainId) {
+  const envValue = process.env[envNativeSwapBridgeRouterName(chainId)]
+  if (envValue && /^0x[0-9a-fA-F]{40}$/.test(envValue)) return getAddress(envValue)
+  const deployed = nativeSwapBridgeDeployments[chainId]?.address
   if (deployed && /^0x[0-9a-fA-F]{40}$/.test(deployed)) return getAddress(deployed)
   return ''
 }
@@ -755,7 +802,7 @@ function extractFirstAddress(text) {
 }
 
 function extractAmountToken(text) {
-  const match = String(text || '').match(/(\d+(?:\.\d+)?)\s*(USDC|EURC|USYC|cirBTC)/i)
+  const match = String(text || '').match(/(\d+(?:\.\d+)?)\s*(USDC|EURC|USYC|cirBTC|ETH|HYPE|SOL)/i)
   if (!match) return { amount: '', token: 'USDC' }
   return { amount: match[1], token: match[2].toUpperCase() === 'CIRBTC' ? 'CIRBTC' : match[2].toUpperCase() }
 }
@@ -931,6 +978,21 @@ async function writeContractBuffered({ chainInfo, address, abi, functionName, ar
     await sleep(1200)
     const retryFees = await bufferedFees(sourceClient, 4n)
     return walletClient.writeContract({ address, abi, functionName, args, ...retryFees })
+  }
+}
+
+async function sendTransactionBuffered({ chainInfo, to, data, value = 0n }) {
+  const sourceClient = clientFor(chainInfo)
+  const { walletClient, account } = walletFor(chainInfo)
+  const fees = await bufferedFees(sourceClient, 3n)
+  try {
+    return await walletClient.sendTransaction({ account, to, data, value, ...fees })
+  } catch (error) {
+    const msg = error?.message || ''
+    if (!/max fee per gas less than block base fee|underpriced|fee/i.test(msg)) throw error
+    await sleep(1200)
+    const retryFees = await bufferedFees(sourceClient, 4n)
+    return walletClient.sendTransaction({ account, to, data, value, ...retryFees })
   }
 }
 
@@ -1168,13 +1230,209 @@ async function solanaUsdcBalance(owner = solanaKeypair().publicKey) {
   return { ata: ata.toBase58(), amount: bal?.value?.uiAmountString || '0' }
 }
 
+function normalizeBridgeTokenKey(value, fallback = 'USDC') {
+  const upper = String(value || fallback).trim().toUpperCase()
+  if (upper === 'ETH_NATIVE') return 'ETH'
+  if (upper === 'HYPE_NATIVE') return 'HYPE'
+  if (upper === 'SOL_NATIVE') return 'SOL'
+  return normalizeArcTokenKey(upper || fallback)
+}
+
+function nativeTokenForChain(chainInfo) {
+  return String(chainInfo?.chain?.nativeCurrency?.symbol || (chainInfo?.solana ? 'SOL' : '')).toUpperCase()
+}
+
+function isNativeBridgeIntent(token, fromInfo, toInfo) {
+  if (!fromInfo || !toInfo || toInfo.id !== 'Arc_Testnet') return false
+  const bridgeToken = normalizeBridgeTokenKey(token)
+  if (!['ETH', 'HYPE', 'SOL'].includes(bridgeToken)) return false
+  return bridgeToken === nativeTokenForChain(fromInfo)
+}
+
+function assertNativeBridgeSupported({ token, source, fromInfo, toInfo }) {
+  const bridgeToken = normalizeBridgeTokenKey(token)
+  if (source === 'circle') throw new Error('Native bridge is only supported from the local EOA agent wallet. Circle Wallet source supports USDC only.')
+  if (!isNativeBridgeIntent(bridgeToken, fromInfo, toInfo)) {
+    throw new Error(`Native ${bridgeToken} bridge is only supported from its source chain to Arc Testnet.`)
+  }
+  if (fromInfo.solana) throw new Error('SOL-native bridge is not enabled in MCP. Current Solana route supports USDC only.')
+  const router = nativeSwapBridgeRouterFor(fromInfo.id)
+  if (!router) throw new Error(`Native ${bridgeToken} bridge router is not deployed for ${fromInfo.id}.`)
+  return router
+}
+
+async function quoteNativeBridgeRoute(intent, owner, fromInfo, toInfo, source = 'eoa') {
+  const token = normalizeBridgeTokenKey(intent.token)
+  const router = assertNativeBridgeSupported({ token, source, fromInfo, toInfo })
+  if (!intent.amount || Number(intent.amount) <= 0) throw new Error(`Native ${token} bridge quote needs a positive amount.`)
+  const nativeAmount = parseUnits(String(intent.amount), 18)
+  const sourceClient = clientFor(fromInfo)
+  const nativeBalance = await sourceClient.getBalance({ address: owner }).catch(() => 0n)
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 900)
+  const quotes = []
+  for (const poolFee of [500, 3000, 10000]) {
+    try {
+      const data = encodeFunctionData({
+        abi: nativeSwapBridgeRouterAbi,
+        functionName: 'swapNativeAndBridgeUsdc',
+        args: [toInfo.domain, bytes32Address(owner), `0x${'0'.repeat(64)}`, poolFee, 1n, deadline, 10n, 1000],
+      })
+      const result = await sourceClient.call({ account: owner, to: router, data, value: nativeAmount })
+      const decoded = decodeFunctionResult({ abi: nativeSwapBridgeRouterAbi, functionName: 'swapNativeAndBridgeUsdc', data: result.data })
+      quotes.push({ poolFee, usdcOut: decoded[0], platformFee: decoded[1], netUsdc: decoded[2], deadline })
+    } catch {}
+  }
+  quotes.sort((a, b) => a.netUsdc === b.netUsdc ? 0 : a.netUsdc > b.netUsdc ? -1 : 1)
+  const best = quotes[0]
+  if (!best || best.netUsdc <= 0n) throw new Error(`No native ${token} route quote succeeded on ${fromInfo.id}. Pool liquidity may be unavailable.`)
+  return {
+    status: 'quote',
+    action: 'bridge',
+    route: 'native-swap-bridge-router',
+    source: 'eoa-agent-wallet',
+    owner,
+    from: fromInfo.id,
+    to: toInfo.id,
+    token,
+    outputToken: 'USDC',
+    amount: String(intent.amount),
+    nativeBalance: formatUnits(nativeBalance, 18),
+    router,
+    poolFee: best.poolFee,
+    quotedUsdcOut: formatUnits(best.usdcOut, 6),
+    platformFee: formatUnits(best.platformFee, 6),
+    estimatedReceive: formatUnits(best.netUsdc, 6),
+    feeBps: PLATFORM_FEE_BPS,
+    approvalRequired: false,
+    supported: nativeBalance > nativeAmount,
+    terminalExecution: 'supported_native_swap_bridge',
+    safeNextStep: 'Ask the user to confirm before calling arcox_execute_bridge with confirmed=true. The agent will send native token to the router, swap to USDC, burn via CCTP, then mint USDC on Arc.',
+  }
+}
+
+async function executeNativeBridge(intent, owner, fromInfo, toInfo) {
+  const quote = await quoteNativeBridgeRoute(intent, owner, fromInfo, toInfo, 'eoa')
+  if (!quote.supported) throw new Error(`Insufficient ${quote.token} on ${fromInfo.id}. Balance ${quote.nativeBalance}, need ${intent.amount} plus gas.`)
+  const nativeAmount = parseUnits(String(intent.amount), 18)
+  const sourceClient = clientFor(fromInfo)
+  const destinationClient = clientFor(toInfo)
+  const minOut = (parseUnits(quote.quotedUsdcOut, 6) * 9950n) / 10000n
+  const data = encodeFunctionData({
+    abi: nativeSwapBridgeRouterAbi,
+    functionName: 'swapNativeAndBridgeUsdc',
+    args: [toInfo.domain, bytes32Address(owner), `0x${'0'.repeat(64)}`, quote.poolFee, minOut, BigInt(Math.floor(Date.now() / 1000) + 900), 10n, 1000],
+  })
+  console.error(`[bridge:native] route ${fromInfo.id} ${quote.token} -> USDC -> ${toInfo.id}`)
+  const burnHash = await sendTransactionBuffered({ chainInfo: fromInfo, to: quote.router, data, value: nativeAmount })
+  const burnReceipt = await waitForReceipt(sourceClient, burnHash, intent.deferMint ? BRIDGE_RECEIPT_WAIT_MS : 0)
+  if (!burnReceipt) {
+    return pendingBridgeStepResult({
+      status: 'pending_burn',
+      route: 'native-swap-bridge-router',
+      router: quote.router,
+      fromInfo,
+      toInfo,
+      owner,
+      amount: quote.estimatedReceive,
+      burnHash,
+      safeNextStep: `Native swap+burn belum confirmed sebelum timeout MCP. Cek tx ${burnHash}, lalu retry mint jika burn sudah confirmed.`,
+    })
+  }
+  if (intent.deferMint) {
+    const attestation = await waitAttestationBeforeAutoMint(fromInfo, burnHash)
+    if (!attestation) {
+      return pendingBridgeMintResult({
+        route: 'native-swap-bridge-router',
+        router: quote.router,
+        fromInfo,
+        toInfo,
+        owner,
+        amount: quote.estimatedReceive,
+        burnHash,
+        safeNextStep: `Native swap+burn selesai. Attestation belum siap setelah ${Math.round(AUTO_MINT_GRACE_WAIT_MS / 1000)} detik; agent auto-mint worker dijadwalkan.`,
+      })
+    }
+    const mintHash = await writeContractBuffered({
+      chainInfo: toInfo,
+      address: toInfo.messageTransmitter,
+      abi: messageTransmitterAbi,
+      functionName: 'receiveMessage',
+      args: [attestation.message, attestation.attestation],
+    })
+    const mintReceipt = await waitForReceipt(destinationClient, mintHash, MCP_MINT_RECEIPT_WAIT_MS)
+    return {
+      status: mintReceipt ? 'submitted' : 'pending_mint_receipt',
+      action: 'bridge',
+      route: 'native-swap-bridge-router',
+      router: quote.router,
+      from: fromInfo.id,
+      to: toInfo.id,
+      owner,
+      amount: String(intent.amount),
+      token: quote.token,
+      outputToken: 'USDC',
+      estimatedReceive: quote.estimatedReceive,
+      platformFee: quote.platformFee,
+      burnTx: burnHash,
+      mintTx: mintHash,
+      burnExplorer: fromInfo.explorer + burnHash,
+      mintExplorer: toInfo.explorer + mintHash,
+      safeNextStep: mintReceipt ? 'Attestation siap dalam grace wait; mint USDC di Arc selesai.' : 'Mint transaction submitted, but receipt was not confirmed before MCP timeout.',
+    }
+  }
+  const attestation = await pollAttestation(fromInfo.domain, burnHash, fromInfo, {
+    maxWaitMs: intent.maxAttestationWaitMs,
+    returnNullOnTimeout: Boolean(intent.maxAttestationWaitMs),
+  })
+  if (!attestation) {
+    return pendingBridgeMintResult({
+      route: 'native-swap-bridge-router',
+      router: quote.router,
+      fromInfo,
+      toInfo,
+      owner,
+      amount: quote.estimatedReceive,
+      burnHash,
+      safeNextStep: 'Attestation belum siap sebelum batas waktu MCP. Agent auto-mint worker dijadwalkan.',
+    })
+  }
+  const mintHash = await writeContractBuffered({
+    chainInfo: toInfo,
+    address: toInfo.messageTransmitter,
+    abi: messageTransmitterAbi,
+    functionName: 'receiveMessage',
+    args: [attestation.message, attestation.attestation],
+  })
+  const mintReceipt = await waitForReceipt(destinationClient, mintHash, MCP_MINT_RECEIPT_WAIT_MS)
+  return {
+    status: mintReceipt ? 'submitted' : 'pending_mint_receipt',
+    action: 'bridge',
+    route: 'native-swap-bridge-router',
+    router: quote.router,
+    from: fromInfo.id,
+    to: toInfo.id,
+    owner,
+    amount: String(intent.amount),
+    token: quote.token,
+    outputToken: 'USDC',
+    estimatedReceive: quote.estimatedReceive,
+    platformFee: quote.platformFee,
+    burnTx: burnHash,
+    mintTx: mintHash,
+    burnExplorer: fromInfo.explorer + burnHash,
+    mintExplorer: toInfo.explorer + mintHash,
+  }
+}
+
 export async function executeBridge(intent, owner) {
-  if ((intent.token || 'USDC') !== 'USDC') throw new Error('CLI bridge adapter currently supports USDC only.')
   if (!intent.amount || Number(intent.amount) <= 0) throw new Error('Bridge command needs amount, example: bridge 5 USDC from Arbitrum Sepolia to Arc')
   const fromInfo = cctpChains[intent.fromChain]
   const toInfo = cctpChains[intent.toChain]
   if (!fromInfo || !toInfo) throw new Error('Unsupported bridge route. Use Arc, Ethereum Sepolia, Base Sepolia, Arbitrum Sepolia, or HyperEVM Testnet.')
   if (fromInfo.id === toInfo.id) throw new Error('Bridge source and destination must be different.')
+  const bridgeToken = normalizeBridgeTokenKey(intent.token)
+  if (isNativeBridgeIntent(bridgeToken, fromInfo, toInfo)) return executeNativeBridge({ ...intent, token: bridgeToken }, owner, fromInfo, toInfo)
+  if (bridgeToken !== 'USDC') throw new Error('MCP bridge supports USDC, plus native ETH from Ethereum/Base Sepolia to Arc when a native router is deployed.')
   if (fromInfo.solana) return executeSolanaToEvm(intent, owner, fromInfo, toInfo)
   if (toInfo.solana) return executeEvmToSolana(intent, owner, fromInfo, toInfo)
 
@@ -2161,14 +2419,15 @@ export async function quoteBridge(intent) {
   const fromChain = normalizeChainName(intent.fromChain) || intent.fromChain
   const toChain = normalizeChainName(intent.toChain) || intent.toChain
   const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
-  const token = normalizeArcTokenKey(intent.token)
-  if (token !== 'USDC') throw new Error('MCP bridge currently supports USDC only.')
+  const token = normalizeBridgeTokenKey(intent.token)
   if (!intent.amount || Number(intent.amount) <= 0) throw new Error('Bridge quote needs a positive amount.')
   const fromInfo = cctpChains[fromChain]
   const toInfo = cctpChains[toChain]
   if (!fromInfo || !toInfo) throw new Error('Unsupported bridge route.')
   if (fromInfo.id === toInfo.id) throw new Error('Bridge source and destination must be different.')
   if (source === 'circle' && fromInfo.id !== 'Arc_Testnet') throw new Error('Circle Wallet bridge source is only supported from Arc Testnet. Use source="eoa" for other source chains.')
+  if (isNativeBridgeIntent(token, fromInfo, toInfo)) return quoteNativeBridgeRoute({ ...intent, token }, account.address, fromInfo, toInfo, source)
+  if (token !== 'USDC') throw new Error('MCP bridge supports USDC, plus native ETH from Ethereum/Base Sepolia to Arc when a native router is deployed.')
   if (fromInfo.solana) {
     if (source === 'circle') throw new Error('Circle Wallet source is not available for Solana source routes.')
     const solana = solanaKeypair()
@@ -2415,7 +2674,7 @@ export async function executeConfirmedBridge(intent) {
   }
   const result = await executeBridge({
     ...intent,
-    token: normalizeArcTokenKey(intent.token),
+    token: normalizeBridgeTokenKey(intent.token),
     fromChain,
     toChain,
     maxAttestationWaitMs: intent.maxAttestationWaitMs || MCP_FAST_ATTESTATION_WAIT_MS,

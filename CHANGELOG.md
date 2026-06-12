@@ -2,6 +2,8 @@
 
 ## 0.1.5
 
+- Add native ETH bridge quote/execution support from Ethereum Sepolia and Base Sepolia to Arc through `ArcoxNativeSwapBridgeRouter`.
+- Add MCP native router deployment resource and native transaction safety limit `ARCOX_MAX_TX_NATIVE`.
 - Align MCP docs with Circle for Agents: USDC-native agent workflows, paid API/x402 readiness, and no live gas-free nanopayments claim.
 - Make MCP swap default to EOA agent wallet instead of Circle proxy wallet.
 - Add EOA swap execution through ARCOX backend `/api/eoa-swap-prepare` plus local `AGENT_PRIVATE_KEY` approve/adapter execute signing.

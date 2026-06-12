@@ -62,6 +62,7 @@ const resources = [
   { uri: 'arcox://ui/chains', name: 'ARCOX Chain Support', mimeType: 'application/json' },
   { uri: 'arcox://rules/retail-safety', name: 'Retail Safety Rules', mimeType: 'application/json' },
   { uri: 'arcox://deployments/router', name: 'Arcox Router Deployments', mimeType: 'application/json' },
+  { uri: 'arcox://deployments/native-swap-bridge-router', name: 'Arcox Native Swap Bridge Router Deployments', mimeType: 'application/json' },
   { uri: 'arcox://docs/catalog', name: 'ARCOX Docs Catalog', mimeType: 'application/json' },
 ]
 
@@ -176,7 +177,7 @@ const tools = [
   },
   {
     name: 'arcox_quote_bridge',
-    description: 'Quote a USDC bridge route, platform fee, estimated receive, and balance before execution. If the user says "circle arc ke solana" or "Circle Wallet Arc to Solana", use source="circle", fromChain="Arc_Testnet", toChain="Solana_Devnet". Circle Wallet bridge source is only valid from Arc Testnet.',
+    description: 'Quote a bridge route before execution. Supports USDC CCTP routes and native ETH from Ethereum/Base Sepolia to Arc via native swap bridge router. Circle Wallet source is only valid for USDC from Arc Testnet.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -192,7 +193,7 @@ const tools = [
   },
   {
     name: 'arcox_execute_bridge',
-    description: 'Execute a confirmed USDC bridge with the local AGENT_PRIVATE_KEY signer. Requires previewId from arcox_quote_bridge when confirmed=true. If the user says "circle arc ke solana" or "Circle Wallet Arc to Solana", use source="circle", fromChain="Arc_Testnet", toChain="Solana_Devnet". Circle Wallet bridge source is only valid from Arc Testnet.',
+    description: 'Execute a confirmed bridge with the local AGENT_PRIVATE_KEY signer. Requires previewId from arcox_quote_bridge when confirmed=true. Supports USDC CCTP routes and native ETH from Ethereum/Base Sepolia to Arc via native swap bridge router. Native bridge must use source="eoa".',
     inputSchema: {
       type: 'object',
       properties: {
@@ -413,12 +414,24 @@ function routerDeployments() {
   }
 }
 
+function nativeSwapBridgeRouterDeployments() {
+  const path = join(agentRoot, 'deployments', 'arcox-native-swap-bridge-router.testnet.json')
+  if (!existsSync(path)) return {}
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    debug('native_router_deployments_read_failed', { message: error.message })
+    return {}
+  }
+}
+
 function readResource(uri) {
   if (uri === 'arcox://ui/pages') return pages
   if (uri === 'arcox://ui/actions') return actions
   if (uri === 'arcox://ui/chains') return chainSupport
   if (uri === 'arcox://rules/retail-safety') return retailRules
   if (uri === 'arcox://deployments/router') return routerDeployments()
+  if (uri === 'arcox://deployments/native-swap-bridge-router') return nativeSwapBridgeRouterDeployments()
   if (uri === 'arcox://docs/catalog') return docsCatalog
   throw new Error(`Unknown resource: ${uri}`)
 }
@@ -559,6 +572,7 @@ const dailySpendBuckets = new Map()
 const PREVIEW_TTL_MS = Number(process.env.ARCOX_PREVIEW_TTL_MS || 10 * 60 * 1000)
 const MAX_TX_USDC = Number(process.env.ARCOX_MAX_TX_USDC || '10')
 const DAILY_LIMIT_USDC = Number(process.env.ARCOX_DAILY_LIMIT_USDC || '50')
+const MAX_TX_NATIVE = Number(process.env.ARCOX_MAX_TX_NATIVE || '0.1')
 let activeValueMovingExecution = null
 
 function isValueMovingCall(name, args) {
@@ -591,6 +605,11 @@ function spendAmountFor(name, args) {
   if (name === 'arcox_pay_payment_request') return Number(args.amount || 0)
   if (name === 'arcox_agent_job') return Number(args.amount || 0)
   return 0
+}
+
+function isNativeBridgeToken(value) {
+  const token = canonicalToken(value)
+  return token === 'ETH' || token === 'HYPE' || token === 'SOL' || token === 'ETH_NATIVE' || token === 'HYPE_NATIVE' || token === 'SOL_NATIVE'
 }
 
 function canonicalAmount(value) {
@@ -690,6 +709,7 @@ function attachPreview(name, args, quote) {
     safetyLimits: {
       maxTxUsdc: MAX_TX_USDC,
       dailyLimitUsdc: DAILY_LIMIT_USDC,
+      maxTxNative: MAX_TX_NATIVE,
     },
     riskChecks: quoteRiskChecks(name, quote),
     confirmationRequired: {
@@ -711,7 +731,11 @@ function quoteRiskChecks(name, quote) {
   if (quote?.router) checks.push({ level: 'info', item: 'router', value: quote.router })
   if (quote?.terminalExecution) checks.push({ level: 'info', item: 'execution', value: quote.terminalExecution })
   const amount = spendAmountFor(canonicalPreviewAction(name), { amount: quote?.amount, amountIn: quote?.amountIn })
-  if (MAX_TX_USDC > 0 && amount > MAX_TX_USDC) checks.push({ level: 'error', item: 'maxTx', message: `Amount exceeds ARCOX_MAX_TX_USDC=${MAX_TX_USDC}.` })
+  if (quote?.route === 'native-swap-bridge-router' && MAX_TX_NATIVE > 0 && amount > MAX_TX_NATIVE) {
+    checks.push({ level: 'error', item: 'maxNativeTx', message: `Native amount exceeds ARCOX_MAX_TX_NATIVE=${MAX_TX_NATIVE}.` })
+  } else if (MAX_TX_USDC > 0 && amount > MAX_TX_USDC) {
+    checks.push({ level: 'error', item: 'maxTx', message: `Amount exceeds ARCOX_MAX_TX_USDC=${MAX_TX_USDC}.` })
+  }
   return checks
 }
 
@@ -751,6 +775,10 @@ function enforceSpendLimits(name, args) {
   if (!isValueMovingCall(name, args)) return
   const amount = spendAmountFor(name, args)
   if (!Number.isFinite(amount) || amount <= 0) return
+  if (name === 'arcox_execute_bridge' && isNativeBridgeToken(args.token)) {
+    if (MAX_TX_NATIVE > 0 && amount > MAX_TX_NATIVE) throw new Error(`Native bridge exceeds ARCOX_MAX_TX_NATIVE=${MAX_TX_NATIVE}. Reduce amount or raise local env limit.`)
+    return
+  }
   if (MAX_TX_USDC > 0 && amount > MAX_TX_USDC) throw new Error(`Transaction exceeds ARCOX_MAX_TX_USDC=${MAX_TX_USDC}. Reduce amount or raise local env limit.`)
   const day = new Date().toISOString().slice(0, 10)
   const key = `local-mcp-client:${day}`
