@@ -9,6 +9,7 @@ It exposes tools for:
 - Bridge quote and execution, including native ETH to Arc on verified Ethereum/Base Sepolia routers
 - Send quote and execution
 - ARCOX Pay invoice/payment request tools
+- ARCOX Pay NOWPayments sandbox tools for create/status/simulated treasury flow
 - Bridge retry and transaction history
 - ARCOX Agentic Economy job actions
 - ARCOX DEX UI/action map for agents
