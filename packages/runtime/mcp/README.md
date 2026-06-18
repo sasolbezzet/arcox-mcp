@@ -50,6 +50,7 @@ Tools:
 - `arcox_create_payment_request`: creates an ARCOX Pay public USDC invoice/payment link on Arc Testnet.
 - `arcox_get_payment_request`, `arcox_quote_payment_request`, `arcox_pay_payment_request`, `arcox_check_payment_status`: read, quote, pay, and track ARCOX Pay invoices.
 - `arcox_pay_create_nowpayments_sandbox_payment`, `arcox_pay_get_payment_status`, and `arcox_pay_simulate_*`: create and test the ARCOX Pay NOWPayments sandbox flow without moving real funds.
+- `arcox_intel_quote_wallet_report`, `arcox_intel_execute_wallet_report`, `arcox_intel_get_address`, `arcox_intel_get_tx`, `arcox_intel_get_contract`, `arcox_intel_get_entity`, `arcox_intel_get_token`, `arcox_intel_search`: request ARCOX Intel via ARCOX API/x402. MCP does not store `ARKHAM_API_KEY`.
 - `arcox_agent_job`: plans and executes Agentic Economy operations: register agent, create/read job, set budget, fund, submit, and complete.
 
 Execution safety:

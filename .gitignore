@@ -2,6 +2,14 @@ node_modules/
 dist/
 coverage/
 .env
+.env.local
+.env.*.local
+*.pem
+*.key
+private-key*
+seed*
+mnemonic*
+.vercel
 *.log
 
 packages/runtime/.env

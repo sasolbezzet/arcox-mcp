@@ -10,6 +10,7 @@ It exposes tools for:
 - Send quote and execution
 - ARCOX Pay invoice/payment request tools
 - ARCOX Pay NOWPayments sandbox tools for create/status/simulated treasury flow
+- ARCOX Intel tools that call ARCOX API x402 endpoints; MCP never stores `ARKHAM_API_KEY` and never calls Arkham directly
 - Bridge retry and transaction history
 - ARCOX Agentic Economy job actions
 - ARCOX DEX UI/action map for agents
