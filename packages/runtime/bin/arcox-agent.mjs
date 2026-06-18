@@ -1005,8 +1005,35 @@ async function getJson(url) {
     signal: AbortSignal.timeout(BACKEND_FETCH_TIMEOUT_MS),
   })
   const data = await response.json().catch(() => ({}))
+  if (response.status === 402) return { status: 'payment_required', requiresPayment: true, ...data, safeNextStep: 'Pay the x402 request with Arc Testnet USDC in ARCOX DEX, then retry with X-PAYMENT-ID and X-PAYMENT-TX proof. MCP does not call Arkham directly or fake production payment.' }
   if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`)
   return data
+}
+
+export function serviceCatalog() {
+  return {
+    project: 'ARCOX DEX + ARCOX MCP',
+    safety: 'All value-moving tools must quote/preview first and require user confirmation.',
+    services: [
+      { name: 'wallet_balances', description: 'Read EOA Arc, Circle proxy wallet, and Solana Devnet balances.' },
+      { name: 'swap', description: 'Quote and execute supported Arc swaps with preview-before-execute.' },
+      { name: 'bridge', description: 'Quote and execute supported USDC CCTP testnet bridge routes; slow attestations may use auto-mint worker.' },
+      { name: 'send', description: 'Quote and send supported Arc tokens from EOA or Circle wallet with confirmation.' },
+      { name: 'bridge_retry', description: 'Retry mint for a completed burn transaction when attestation is ready.' },
+      { name: 'arcox_pay', description: 'Create/check sandbox NOWPayments and ARCOX Pay invoice/payment workflows.' },
+      { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode requires Arc Testnet USDC x402 payment proof.' },
+      { name: 'agentic_jobs', description: 'Plan/create/read/fund/submit/complete testnet Agentic Economy jobs.' },
+    ],
+    examplePrompts: [
+      'show all wallet balances',
+      'quote bridge 1 usdc from arc to base',
+      'send 1 eurc from eoa to 0x...',
+      'retry bridge 0xBURN_TX from arbitrum sepolia to arc',
+      'quote swap 1 eurc to usdc',
+      'create payment request 10 usdc to 0x...',
+      'quote arkham wallet report for 0x...',
+    ],
+  }
 }
 
 export async function backendSession(account) {
@@ -3099,7 +3126,7 @@ export async function intelExecuteWalletReport(input = {}) {
   }
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { mockPaid: true }, 60_000)
+  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { mockPaid: Boolean(input.mockPaid) }, 60_000)
 }
 
 export async function intelGetAddress(input = {}) {

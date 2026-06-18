@@ -25,6 +25,7 @@ import {
   intelQuoteWalletReport,
   intelSearch,
   makeAgentResponse,
+  serviceCatalog,
   payPaymentRequest,
   payCreateNowpaymentsSandboxPayment,
   payGetPaymentStatus,
@@ -147,6 +148,11 @@ const tools = [
       required: ['id'],
       additionalProperties: false,
     },
+  },
+  {
+    name: 'arcox_service_catalog',
+    description: 'Return a concise catalog of ARCOX MCP services, capabilities, safety rules, and example prompts.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
     name: 'arcox_ui_map',
@@ -1013,6 +1019,7 @@ async function rpcResponse(message) {
     if (isValueMovingCall(name, args)) enforceRateLimit('local-mcp-client')
     if (name === 'arcox_search_docs') return result(id, searchDocs(args))
     if (name === 'arcox_read_doc') return result(id, readDoc(args))
+    if (name === 'arcox_service_catalog') return result(id, serviceCatalog())
     if (name === 'arcox_ui_map') return result(id, { webUrl: ARCOX_WEB_URL, apiUrl: ARCOX_API_URL, pages, actions, chainSupport, retailRules })
     if (name === 'arcox_action_plan') return result(id, actionPlan(args))
     if (name === 'arcox_route_status') return result(id, routeStatus(args))
