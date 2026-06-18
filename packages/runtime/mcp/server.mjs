@@ -495,10 +495,10 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_address',
-    description: 'Get address intelligence through ARCOX API. Returns x402 payment requirement unless mockPaid=true is accepted by backend dev mode.',
+    description: 'Get address intelligence through ARCOX API. Returns x402 payment requirement when real Arc USDC payment is required.',
     inputSchema: {
       type: 'object',
-      properties: { address: { type: 'string' }, mockPaid: { type: 'boolean' } },
+      properties: { address: { type: 'string' } },
       required: ['address'],
       additionalProperties: false,
     },
@@ -508,7 +508,7 @@ const tools = [
     description: 'Get transaction intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { hash: { type: 'string' }, mockPaid: { type: 'boolean' } },
+      properties: { hash: { type: 'string' } },
       required: ['hash'],
       additionalProperties: false,
     },
@@ -518,7 +518,7 @@ const tools = [
     description: 'Get contract intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { chain: { type: 'string' }, address: { type: 'string' }, mockPaid: { type: 'boolean' } },
+      properties: { chain: { type: 'string' }, address: { type: 'string' } },
       required: ['chain', 'address'],
       additionalProperties: false,
     },
@@ -528,7 +528,7 @@ const tools = [
     description: 'Get entity intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { entity: { type: 'string' }, mockPaid: { type: 'boolean' } },
+      properties: { entity: { type: 'string' } },
       required: ['entity'],
       additionalProperties: false,
     },
@@ -538,7 +538,7 @@ const tools = [
     description: 'Get token intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { token: { type: 'string' }, mockPaid: { type: 'boolean' } },
+      properties: { token: { type: 'string' } },
       required: ['token'],
       additionalProperties: false,
     },
@@ -548,7 +548,7 @@ const tools = [
     description: 'Search Arkham intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { query: { type: 'string' }, mockPaid: { type: 'boolean' } },
+      properties: { query: { type: 'string' } },
       required: ['query'],
       additionalProperties: false,
     },

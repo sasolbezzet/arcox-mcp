@@ -988,7 +988,6 @@ async function arcoxApiGetJson(path, options = {}, timeoutMs = BACKEND_FETCH_TIM
   const response = await fetch(`${ARCOX_API_BASE_URL}${path}`, {
     headers: {
       Accept: 'application/json',
-      ...(options.mockPaid ? { 'X-PAYMENT': 'mock-paid' } : {}),
       ...(options.headers || {}),
     },
     signal: AbortSignal.timeout(timeoutMs),
@@ -1561,7 +1560,33 @@ export async function executeBridge(intent, owner) {
   if (fromInfo.id === toInfo.id) throw new Error('Bridge source and destination must be different.')
   const bridgeToken = normalizeBridgeTokenKey(intent.token)
   if (isNativeBridgeIntent(bridgeToken, fromInfo, toInfo)) return executeNativeBridge({ ...intent, token: bridgeToken }, owner, fromInfo, toInfo)
-  if (bridgeToken !== 'USDC') throw new Error('MCP bridge supports USDC, plus native ETH from Ethereum/Base Sepolia to Arc when a native router is deployed.')
+  if (bridgeToken !== 'USDC') {
+    const receiveToken = normalizeBridgeTokenKey(intent.receiveToken || intent.outputToken || 'USDC')
+    if (fromInfo.id !== 'Arc_Testnet') throw new Error('MCP multi-token bridge can only swap before bridge on Arc Testnet. For this source chain, bridge USDC directly.')
+    if (receiveToken !== 'USDC') throw new Error('MCP receive-token swap after mint is not enabled yet. Receive USDC, then run a separate Arc swap.')
+    const preSwap = await executeSwap({
+      amount: intent.amount,
+      tokenIn: bridgeToken,
+      tokenOut: 'USDC',
+      source: intent.source || intent.walletSource || 'eoa',
+    }, owner)
+    const bridgeAmount = preSwap?.result?.amountOut || preSwap?.quote?.amountOut
+    if (!bridgeAmount || Number(bridgeAmount) <= 0) throw new Error(`Pre-bridge swap ${bridgeToken} -> USDC did not return a valid output amount.`)
+    const bridge = await executeBridge({
+      ...intent,
+      amount: bridgeAmount,
+      token: 'USDC',
+    }, owner)
+    return {
+      ...bridge,
+      route: 'swap-to-usdc-then-bridge',
+      inputToken: bridgeToken,
+      inputAmount: String(intent.amount),
+      bridgeAmount,
+      preSwap,
+      note: `MCP executed a real ${bridgeToken} -> USDC swap on Arc first, then bridged the resulting USDC.`,
+    }
+  }
   if (fromInfo.solana) return executeSolanaToEvm(intent, owner, fromInfo, toInfo)
   if (toInfo.solana) return executeEvmToSolana(intent, owner, fromInfo, toInfo)
 
@@ -2563,7 +2588,64 @@ export async function quoteBridge(intent) {
   if (fromInfo.id === toInfo.id) throw new Error('Bridge source and destination must be different.')
   if (source === 'circle' && fromInfo.id !== 'Arc_Testnet') throw new Error('Circle Wallet bridge source is only supported from Arc Testnet. Use source="eoa" for other source chains.')
   if (isNativeBridgeIntent(token, fromInfo, toInfo)) return quoteNativeBridgeRoute({ ...intent, token }, account.address, fromInfo, toInfo, source)
-  if (token !== 'USDC') throw new Error('MCP bridge supports USDC, plus native ETH from Ethereum/Base Sepolia to Arc when a native router is deployed.')
+  if (token !== 'USDC') {
+    const receiveToken = normalizeBridgeTokenKey(intent.receiveToken || intent.outputToken || 'USDC')
+    if (fromInfo.id !== 'Arc_Testnet') throw new Error('MCP multi-token bridge can only swap before bridge on Arc Testnet. For this source chain, bridge USDC directly.')
+    if (receiveToken !== 'USDC') throw new Error('MCP receive-token swap after mint is not enabled yet. Receive USDC, then run a separate Arc swap.')
+    const authToken = await backendSession(account)
+    const apiTokenIn = apiArcTokenKey(token)
+    const swapQuote = await postJson(source === 'circle' ? '/api/quote' : '/api/eoa-swap-quote', {
+      metamaskAddress: account.address,
+      tokenIn: apiTokenIn,
+      tokenOut: 'USDC',
+      amountIn: String(intent.amount),
+    }, authToken)
+    if (swapQuote.available === false) {
+      return {
+        status: 'route_unavailable',
+        action: 'bridge',
+        route: 'swap-to-usdc-then-bridge',
+        source: source === 'circle' ? 'circle-wallet-proxy' : 'eoa-agent-wallet',
+        owner: account.address,
+        from: fromInfo.id,
+        to: toInfo.id,
+        token,
+        receiveToken: 'USDC',
+        amount: String(intent.amount),
+        swapQuote,
+      }
+    }
+    const bridgeAmount = String(swapQuote.amountOut || '0')
+    const amount = parseUnits(bridgeAmount, 6)
+    const router = routerFor(fromInfo.id)
+    if (!router) throw new Error(`ArcoxRouter is not deployed for ${fromInfo.id}; refusing direct bridge without platform fee.`)
+    const routerQuote = await clientFor(fromInfo)
+      .readContract({ address: router, abi: arcoxRouterAbi, functionName: 'quoteFee', args: [amount] })
+      .catch(() => null)
+    const fee = routerQuote ? BigInt(routerQuote[0] ?? 0) : 0n
+    const netAmount = routerQuote ? BigInt(routerQuote[1] ?? amount) : amount
+    return {
+      status: 'quote',
+      action: 'bridge',
+      route: 'swap-to-usdc-then-bridge',
+      source: source === 'circle' ? 'circle-wallet-proxy' : 'eoa-agent-wallet',
+      owner: account.address,
+      from: fromInfo.id,
+      to: toInfo.id,
+      inputToken: token,
+      inputAmount: String(intent.amount),
+      token: 'USDC',
+      receiveToken: 'USDC',
+      bridgeAmount,
+      swapQuote,
+      router,
+      platformFee: formatUnits(fee, 6),
+      estimatedReceive: formatUnits(netAmount, 6),
+      approvalRequired: true,
+      supported: Number(bridgeAmount) > 0,
+      safeNextStep: 'Ask the user to confirm before calling arcox_execute_bridge with confirmed=true. MCP will execute a real Arc swap to USDC first, then bridge USDC.',
+    }
+  }
   if (fromInfo.solana) {
     if (source === 'circle') throw new Error('Circle Wallet source is not available for Solana source routes.')
     const solana = solanaKeypair()
@@ -3126,44 +3208,44 @@ export async function intelExecuteWalletReport(input = {}) {
   }
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { mockPaid: Boolean(input.mockPaid) }, 60_000)
+  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, {}, 60_000)
 }
 
 export async function intelGetAddress(input = {}) {
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  return arcoxApiGetJson(`/api/intel/address/${encodeURIComponent(address)}`, { mockPaid: Boolean(input.mockPaid) })
+  return arcoxApiGetJson(`/api/intel/address/${encodeURIComponent(address)}`)
 }
 
 export async function intelGetTx(input = {}) {
   const hash = String(input.hash || input.txHash || '').trim()
   if (!hash) throw new Error('hash is required.')
-  return arcoxApiGetJson(`/api/intel/tx/${encodeURIComponent(hash)}`, { mockPaid: Boolean(input.mockPaid) })
+  return arcoxApiGetJson(`/api/intel/tx/${encodeURIComponent(hash)}`)
 }
 
 export async function intelGetContract(input = {}) {
   const chain = String(input.chain || '').trim()
   const address = String(input.address || '').trim()
   if (!chain || !address) throw new Error('chain and address are required.')
-  return arcoxApiGetJson(`/api/intel/contract/${encodeURIComponent(chain)}/${encodeURIComponent(address)}`, { mockPaid: Boolean(input.mockPaid) })
+  return arcoxApiGetJson(`/api/intel/contract/${encodeURIComponent(chain)}/${encodeURIComponent(address)}`)
 }
 
 export async function intelGetEntity(input = {}) {
   const entity = String(input.entity || '').trim()
   if (!entity) throw new Error('entity is required.')
-  return arcoxApiGetJson(`/api/intel/entity/${encodeURIComponent(entity)}`, { mockPaid: Boolean(input.mockPaid) })
+  return arcoxApiGetJson(`/api/intel/entity/${encodeURIComponent(entity)}`)
 }
 
 export async function intelGetToken(input = {}) {
   const token = String(input.token || input.id || '').trim()
   if (!token) throw new Error('token is required.')
-  return arcoxApiGetJson(`/api/intel/token/${encodeURIComponent(token)}`, { mockPaid: Boolean(input.mockPaid) })
+  return arcoxApiGetJson(`/api/intel/token/${encodeURIComponent(token)}`)
 }
 
 export async function intelSearch(input = {}) {
   const query = String(input.q || input.query || '').trim()
   if (!query) throw new Error('query is required.')
-  return arcoxApiGetJson(`/api/intel/search?q=${encodeURIComponent(query)}`, { mockPaid: Boolean(input.mockPaid) })
+  return arcoxApiGetJson(`/api/intel/search?q=${encodeURIComponent(query)}`)
 }
 
 function isSimpleConfirmationText(value) {
