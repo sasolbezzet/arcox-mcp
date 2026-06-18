@@ -48,6 +48,7 @@ import {
   submitAgentJob,
   transactionHistory,
   walletBalances,
+  x402InvoiceStatus,
 } from '../bin/arcox-agent.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -480,6 +481,18 @@ const tools = [
     },
   },
   {
+    name: 'arcox_x402_invoice_status',
+    description: 'Check an internal ARCOX x402 invoice status. Paid invoices are set by Circle transactions.inbound webhook; no txHash submission is accepted.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string' },
+        paymentId: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'arcox_intel_execute_wallet_report',
     description: 'Execute an ARCOX Intel full wallet report through the ARCOX API backend after explicit user confirmation. MCP does not call Arkham directly.',
     inputSchema: {
@@ -495,10 +508,10 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_address',
-    description: 'Get address intelligence through ARCOX API. Returns x402 payment requirement when real Arc USDC payment is required.',
+    description: 'Get address intelligence through ARCOX API. Returns an internal x402 invoice; retry with paymentId after Circle webhook marks it paid.',
     inputSchema: {
       type: 'object',
-      properties: { address: { type: 'string' } },
+      properties: { address: { type: 'string' }, paymentId: { type: 'string' } },
       required: ['address'],
       additionalProperties: false,
     },
@@ -508,7 +521,7 @@ const tools = [
     description: 'Get transaction intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { hash: { type: 'string' } },
+      properties: { hash: { type: 'string' }, paymentId: { type: 'string' } },
       required: ['hash'],
       additionalProperties: false,
     },
@@ -518,7 +531,7 @@ const tools = [
     description: 'Get contract intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { chain: { type: 'string' }, address: { type: 'string' } },
+      properties: { chain: { type: 'string' }, address: { type: 'string' }, paymentId: { type: 'string' } },
       required: ['chain', 'address'],
       additionalProperties: false,
     },
@@ -528,7 +541,7 @@ const tools = [
     description: 'Get entity intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { entity: { type: 'string' } },
+      properties: { entity: { type: 'string' }, paymentId: { type: 'string' } },
       required: ['entity'],
       additionalProperties: false,
     },
@@ -538,7 +551,7 @@ const tools = [
     description: 'Get token intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { token: { type: 'string' } },
+      properties: { token: { type: 'string' }, paymentId: { type: 'string' } },
       required: ['token'],
       additionalProperties: false,
     },
@@ -548,7 +561,7 @@ const tools = [
     description: 'Search Arkham intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { query: { type: 'string' } },
+      properties: { query: { type: 'string' }, paymentId: { type: 'string' } },
       required: ['query'],
       additionalProperties: false,
     },
@@ -1096,6 +1109,7 @@ async function rpcResponse(message) {
     if (name === 'arcox_pay_simulate_nowpayments_finished') return result(id, await paySimulateNowpaymentsFinished(args))
     if (name === 'arcox_pay_simulate_nowpayments_status') return result(id, await paySimulateNowpaymentsStatus(args))
     if (name === 'arcox_pay_list_recent_payments') return result(id, await payListRecentPayments(args))
+    if (name === 'arcox_x402_invoice_status') return result(id, await x402InvoiceStatus(args))
     if (name === 'arcox_intel_quote_wallet_report') return result(id, await intelQuoteWalletReport(args))
     if (name === 'arcox_intel_execute_wallet_report') return result(id, await intelExecuteWalletReport(args))
     if (name === 'arcox_intel_get_address') return result(id, await intelGetAddress(args))

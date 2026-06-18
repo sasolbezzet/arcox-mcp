@@ -988,12 +988,13 @@ async function arcoxApiGetJson(path, options = {}, timeoutMs = BACKEND_FETCH_TIM
   const response = await fetch(`${ARCOX_API_BASE_URL}${path}`, {
     headers: {
       Accept: 'application/json',
+      ...(options.paymentId ? { 'X-PAYMENT-ID': options.paymentId } : {}),
       ...(options.headers || {}),
     },
     signal: AbortSignal.timeout(timeoutMs),
   })
   const data = await response.json().catch(() => ({}))
-  if (response.status === 402) return { paymentRequired: true, ...data }
+  if (response.status === 402) return { paymentRequired: true, ...data, safeNextStep: 'Pay the exact invoice amount to the Circle treasury wallet. Do not submit a txHash. Poll /api/x402/invoices/:invoiceId/status until Circle webhook marks it paid, then retry with paymentId.' }
   if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`)
   return data
 }
@@ -1004,7 +1005,7 @@ async function getJson(url) {
     signal: AbortSignal.timeout(BACKEND_FETCH_TIMEOUT_MS),
   })
   const data = await response.json().catch(() => ({}))
-  if (response.status === 402) return { status: 'payment_required', requiresPayment: true, ...data, safeNextStep: 'Pay the x402 request with Arc Testnet USDC in ARCOX DEX, then retry with X-PAYMENT-ID and X-PAYMENT-TX proof. MCP does not call Arkham directly or fake production payment.' }
+  if (response.status === 402) return { status: 'payment_required', requiresPayment: true, ...data, safeNextStep: 'Pay the exact x402 invoice amount to the Circle treasury wallet. Circle transactions.inbound webhook unlocks access; do not submit a txHash.' }
   if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`)
   return data
 }
@@ -3185,6 +3186,12 @@ export async function payListRecentPayments(input = {}) {
   return payGetJson(`/api/payments/nowpayments/recent?limit=${encodeURIComponent(String(input.limit || 10))}`)
 }
 
+export async function x402InvoiceStatus(input = {}) {
+  const invoiceId = String(input.invoiceId || input.paymentId || '').trim()
+  if (!invoiceId) throw new Error('invoiceId or paymentId is required.')
+  return arcoxApiGetJson(`/api/x402/invoices/${encodeURIComponent(invoiceId)}/status`)
+}
+
 export async function intelQuoteWalletReport(input = {}) {
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
@@ -3208,44 +3215,44 @@ export async function intelExecuteWalletReport(input = {}) {
   }
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, {}, 60_000)
+  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: input.paymentId }, 60_000)
 }
 
 export async function intelGetAddress(input = {}) {
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  return arcoxApiGetJson(`/api/intel/address/${encodeURIComponent(address)}`)
+  return arcoxApiGetJson(`/api/intel/address/${encodeURIComponent(address)}`, { paymentId: input.paymentId })
 }
 
 export async function intelGetTx(input = {}) {
   const hash = String(input.hash || input.txHash || '').trim()
   if (!hash) throw new Error('hash is required.')
-  return arcoxApiGetJson(`/api/intel/tx/${encodeURIComponent(hash)}`)
+  return arcoxApiGetJson(`/api/intel/tx/${encodeURIComponent(hash)}`, { paymentId: input.paymentId })
 }
 
 export async function intelGetContract(input = {}) {
   const chain = String(input.chain || '').trim()
   const address = String(input.address || '').trim()
   if (!chain || !address) throw new Error('chain and address are required.')
-  return arcoxApiGetJson(`/api/intel/contract/${encodeURIComponent(chain)}/${encodeURIComponent(address)}`)
+  return arcoxApiGetJson(`/api/intel/contract/${encodeURIComponent(chain)}/${encodeURIComponent(address)}`, { paymentId: input.paymentId })
 }
 
 export async function intelGetEntity(input = {}) {
   const entity = String(input.entity || '').trim()
   if (!entity) throw new Error('entity is required.')
-  return arcoxApiGetJson(`/api/intel/entity/${encodeURIComponent(entity)}`)
+  return arcoxApiGetJson(`/api/intel/entity/${encodeURIComponent(entity)}`, { paymentId: input.paymentId })
 }
 
 export async function intelGetToken(input = {}) {
   const token = String(input.token || input.id || '').trim()
   if (!token) throw new Error('token is required.')
-  return arcoxApiGetJson(`/api/intel/token/${encodeURIComponent(token)}`)
+  return arcoxApiGetJson(`/api/intel/token/${encodeURIComponent(token)}`, { paymentId: input.paymentId })
 }
 
 export async function intelSearch(input = {}) {
   const query = String(input.q || input.query || '').trim()
   if (!query) throw new Error('query is required.')
-  return arcoxApiGetJson(`/api/intel/search?q=${encodeURIComponent(query)}`)
+  return arcoxApiGetJson(`/api/intel/search?q=${encodeURIComponent(query)}`, { paymentId: input.paymentId })
 }
 
 function isSimpleConfirmationText(value) {
