@@ -3192,11 +3192,11 @@ export async function x402PayInvoice(input = {}) {
   const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 45_000 }).catch(() => null)
   if (receipt?.status === 'reverted') throw new Error(`x402 USDC payment reverted: ${txHash}`)
   let latest = invoice
-  for (let i = 0; i < 18; i++) {
-    await sleep(5000)
+  for (let i = 0; i < 20; i++) {
     const next = await x402InvoiceStatus({ invoiceId })
     latest = next.x402 || next.invoice || latest
     if (latest.status === 'paid') break
+    await sleep(2000)
   }
   return {
     status: latest.status === 'paid' ? 'paid' : 'pending_webhook',
