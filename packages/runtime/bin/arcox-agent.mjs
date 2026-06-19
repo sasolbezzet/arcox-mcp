@@ -3196,6 +3196,9 @@ export async function x402PayInvoice(input = {}) {
       instruction: `Confirm to pay ${amount} USDC to ${invoice.recipient} for ${invoice.invoiceId}.`,
     }
   }
+  if (input.mcpPreviewVerified !== true) {
+    throw new Error('x402 payment requires a verified MCP previewId. Call arcox_x402_pay_invoice without confirmed first, show the preview to the user, then execute with confirmed=true, previewId, and confirmationText.')
+  }
   const { account, walletClient } = wallet()
   const balance = await publicClient.readContract({ address: ARC_USDC, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }).catch(() => 0n)
   if (balance < amountUnits) throw new Error(`Insufficient USDC. Balance ${formatUnits(balance, 6)}, need ${amount}.`)

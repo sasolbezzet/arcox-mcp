@@ -1042,7 +1042,7 @@ async function rpcResponse(message) {
       if (args.confirmed !== true) return result(id, attachPreview(name, args, await x402PayInvoice(args)))
       enforcePreview(name, args)
       enforceSpendLimits(name, args)
-      return result(id, await runValueMovingTool(name, args, () => x402PayInvoice(args)))
+      return result(id, await runValueMovingTool(name, args, () => x402PayInvoice({ ...args, mcpPreviewVerified: true })))
     }
     if (name === 'arcox_intel_quote_wallet_report') return result(id, await intelQuoteWalletReport(args))
     if (name === 'arcox_intel_execute_wallet_report') return result(id, await intelExecuteWalletReport(args))
