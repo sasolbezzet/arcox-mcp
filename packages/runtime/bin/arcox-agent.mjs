@@ -3154,13 +3154,29 @@ export async function x402InvoiceStatus(input = {}) {
   return arcoxApiGetJson(`/api/x402/invoices/${encodeURIComponent(invoiceId)}/status`)
 }
 
+async function unlockX402Resource(invoice, explorer = '') {
+  const resource = String(invoice?.resource || '')
+  if (!invoice?.paymentId || !resource.startsWith('/api/intel/')) return null
+  const data = await arcoxApiGetJson(resource, { paymentId: invoice.paymentId }, 60_000)
+  return {
+    ...data,
+    x402Payment: {
+      ...invoice,
+      explorer,
+    },
+  }
+}
+
 export async function x402PayInvoice(input = {}) {
   const invoiceId = String(input.invoiceId || input.paymentId || '').trim()
   if (!invoiceId) throw new Error('invoiceId or paymentId is required.')
   const status = await x402InvoiceStatus({ invoiceId })
   const invoice = status.x402 || status.invoice
   if (!invoice) throw new Error('x402 invoice not found.')
-  if (invoice.status === 'paid') return { status: 'paid', invoice, alreadyPaid: true }
+  if (invoice.status === 'paid') {
+    const unlockedResult = await unlockX402Resource(invoice, invoice.txHash ? `${EXPLORER_TX}${invoice.txHash}` : '').catch(error => ({ ok: false, error: error.message }))
+    return { status: 'paid', invoice, alreadyPaid: true, unlockedResult }
+  }
   if (invoice.status !== 'pending') throw new Error(`x402 invoice status is ${invoice.status}.`)
   if (invoice.asset !== 'USDC') throw new Error('Only USDC x402 invoices are supported.')
   if (!invoice.recipient || !String(invoice.recipient).startsWith('0x')) throw new Error('x402 invoice recipient is invalid.')
@@ -3198,13 +3214,18 @@ export async function x402PayInvoice(input = {}) {
     if (latest.status === 'paid') break
     await sleep(2000)
   }
+  const explorer = `${EXPLORER_TX}${txHash}`
+  const unlockedResult = latest.status === 'paid'
+    ? await unlockX402Resource({ ...latest, txHash: latest.txHash || txHash }, explorer).catch(error => ({ ok: false, error: error.message }))
+    : null
   return {
     status: latest.status === 'paid' ? 'paid' : 'pending_webhook',
     invoice: latest,
     txHash,
-    explorer: `${EXPLORER_TX}${txHash}`,
+    explorer,
+    unlockedResult,
     safeNextStep: latest.status === 'paid'
-      ? 'Retry the Intel request with this paymentId to get the Arkham result.'
+      ? 'Paid. If unlockedResult is present, return it to the user immediately.'
       : 'USDC transfer submitted. Wait for Circle transactions.inbound webhook, then check invoice status again.',
   }
 }
