@@ -77,7 +77,56 @@ const resources = [
   { uri: 'arcox://deployments/router', name: 'Arcox Router Deployments', mimeType: 'application/json' },
   { uri: 'arcox://deployments/native-swap-bridge-router', name: 'Arcox Native Swap Bridge Router Deployments', mimeType: 'application/json' },
   { uri: 'arcox://docs/catalog', name: 'ARCOX Docs Catalog', mimeType: 'application/json' },
+  { uri: 'arcox://tools/execution-guide', name: 'ARCOX Tool Execution Guide', mimeType: 'application/json' },
 ]
+
+const executionGuide = {
+  rule: 'Never guess tool order. For every value-moving request: route/status or quote first, show preview, wait for user yes, then execute with previewId and confirmationText.',
+  readOnlyFirst: ['arcox_service_catalog', 'arcox_execution_guide', 'arcox_action_plan', 'arcox_route_status', 'arcox_wallet_balances', 'arcox_transaction_history'],
+  flows: [
+    {
+      intent: 'swap',
+      steps: ['arcox_quote_swap', 'show previewId/amount/tokenIn/tokenOut/source/fee', 'user yes', 'arcox_execute_swap with confirmed=true, previewId, confirmationText'],
+      never: ['Do not call arcox_execute_swap first.', 'Do not change tokenIn/tokenOut/amount/source after quote.'],
+    },
+    {
+      intent: 'bridge',
+      steps: ['arcox_route_status', 'arcox_quote_bridge', 'show previewId/from/to/amount/token/source/fee', 'user yes', 'arcox_execute_bridge with confirmed=true, previewId, confirmationText'],
+      never: ['Do not call arcox_execute_bridge first.', 'For bulk bridge, repeat quote and confirmation per chain.'],
+    },
+    {
+      intent: 'send',
+      steps: ['arcox_quote_send', 'show previewId/to/amount/token/source/recipient receive', 'user yes', 'arcox_execute_send with confirmed=true, previewId, confirmationText'],
+      never: ['Do not call arcox_execute_send first.', 'Do not infer recipient if missing.'],
+    },
+    {
+      intent: 'x402 intel',
+      steps: ['arcox_intel_get_address/tx/contract/entity/token/search to get invoice', 'arcox_x402_pay_invoice without confirmed to get previewId', 'show exact amount/recipient/resource', 'user yes', 'arcox_x402_pay_invoice with confirmed=true, previewId, confirmationText', 'return unlockedResult immediately'],
+      never: ['Do not execute x402 payment without previewId.', 'Do not ask user to submit txHash manually.'],
+    },
+    {
+      intent: 'payment request',
+      steps: ['arcox_create_payment_request or arcox_get_payment_request', 'arcox_quote_payment_request', 'show previewId/invoice/merchant/amount', 'user yes', 'arcox_pay_payment_request with confirmed=true, previewId, confirmationText'],
+      never: ['Do not pay invoice without quote preview.', 'Do not pay expired or already paid invoice.'],
+    },
+    {
+      intent: 'bridge retry',
+      steps: ['arcox_transaction_history or user burnTx', 'arcox_retry_bridge without confirmed for plan/status if available', 'user yes only if retry signs/mints', 'arcox_retry_bridge with confirmed=true'],
+      never: ['Do not repeat burn when burn succeeded.', 'Do not retry with missing burnTx.'],
+    },
+    {
+      intent: 'agentic job',
+      steps: ['arcox_agent_job operation=plan/read-* first', 'show job/budget/action', 'user yes', 'arcox_agent_job with value-moving operation only after confirmation'],
+      never: ['Do not fund/complete/submit silently.'],
+    },
+  ],
+  recovery: [
+    'If a tool returns preview_required, call the same tool without confirmed to get previewId.',
+    'If MCP says route unavailable, call arcox_route_status and explain the unsupported slot.',
+    'If invoice status is pending, poll arcox_x402_invoice_status; do not ask for txHash.',
+    'If a call times out, check status/history before repeating value-moving execution.',
+  ],
+}
 
 const docsCatalog = [
   {
@@ -109,6 +158,12 @@ const docsCatalog = [
     title: 'MCP Safety Rules',
     tags: ['mcp', 'agent', 'safety', 'confirmation'],
     body: 'Agents must call quote tools first, show preview details to the user, receive a simple explicit confirmation, then execute with previewId and confirmationText. Bulk transactions require one quote and one confirmation per operation.',
+  },
+  {
+    id: 'tool-execution-guide',
+    title: 'ARCOX Tool Execution Guide',
+    tags: ['tools', 'route', 'execution', 'preview', 'mcp'],
+    body: 'Use arcox_execution_guide before value-moving flows. It maps user intents to exact tool order so agents do not guess, skip previews, or call execute tools with missing previewId.',
   },
   {
     id: 'bridge-retry',
@@ -149,6 +204,17 @@ const tools = [
     name: 'arcox_service_catalog',
     description: 'Return a concise catalog of ARCOX MCP services, capabilities, safety rules, and example prompts.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'arcox_execution_guide',
+    description: 'Return exact step-by-step tool routes for every ARCOX MCP flow so agents do not guess tool order.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        intent: { type: 'string', description: 'Optional filter: swap, bridge, send, x402 intel, payment request, bridge retry, agentic job.' },
+      },
+      additionalProperties: false,
+    },
   },
   {
     name: 'arcox_ui_map',
@@ -580,7 +646,22 @@ function readResource(uri) {
   if (uri === 'arcox://deployments/router') return routerDeployments()
   if (uri === 'arcox://deployments/native-swap-bridge-router') return nativeSwapBridgeRouterDeployments()
   if (uri === 'arcox://docs/catalog') return docsCatalog
+  if (uri === 'arcox://tools/execution-guide') return executionGuide
   throw new Error(`Unknown resource: ${uri}`)
+}
+
+function getExecutionGuide(args = {}) {
+  const intent = String(args.intent || '').trim().toLowerCase()
+  const flows = intent
+    ? executionGuide.flows.filter(flow => flow.intent.includes(intent) || intent.includes(flow.intent))
+    : executionGuide.flows
+  return {
+    ...executionGuide,
+    flows: flows.length ? flows : executionGuide.flows,
+    safeNextStep: flows.length
+      ? 'Follow the listed steps exactly. For value-moving flows, execute only after the user confirms the preview.'
+      : 'No exact filter match. Use the full guide and ask the user for missing slots.',
+  }
 }
 
 function searchDocs(args) {
@@ -629,7 +710,7 @@ function actionPlan(args) {
     return {
       status: 'needs_clarification',
       reason: 'No matching ARCOX action found.',
-      safeNextStep: 'Ask whether user wants swap, bridge, send, retry bridge, or agent job.',
+      safeNextStep: 'Call arcox_execution_guide, then ask whether user wants swap, bridge, send, x402 intel, retry bridge, payment request, or agent job.',
       ui: { webUrl: ARCOX_WEB_URL, apiUrl: ARCOX_API_URL },
     }
   }
@@ -640,9 +721,10 @@ function actionPlan(args) {
     page,
     missingSlots: action.requiredSlots,
     safetyRules: retailRules,
+    executionGuide: getExecutionGuide({ intent: action.id || action.page || args.intent }).flows,
     safeNextStep: action.safeExecution === 'read_only'
       ? 'Fetch quote/status only.'
-      : 'Show quote/plan and request explicit user confirmation before execution.',
+      : 'Follow executionGuide exactly: quote/preview first, request explicit user confirmation, then execute with previewId and confirmationText.',
     ui: { webUrl: ARCOX_WEB_URL, apiUrl: ARCOX_API_URL },
   }
 }
@@ -967,6 +1049,7 @@ async function rpcResponse(message) {
     if (name === 'arcox_search_docs') return result(id, searchDocs(args))
     if (name === 'arcox_read_doc') return result(id, readDoc(args))
     if (name === 'arcox_service_catalog') return result(id, serviceCatalog())
+    if (name === 'arcox_execution_guide') return result(id, getExecutionGuide(args))
     if (name === 'arcox_ui_map') return result(id, { webUrl: ARCOX_WEB_URL, apiUrl: ARCOX_API_URL, pages, actions, chainSupport, retailRules })
     if (name === 'arcox_action_plan') return result(id, actionPlan(args))
     if (name === 'arcox_route_status') return result(id, routeStatus(args))
