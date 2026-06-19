@@ -412,6 +412,7 @@ const tools = [
       properties: {
         invoiceId: { type: 'string' },
         paymentId: { type: 'string' },
+        previewId: { type: 'string' },
         confirmed: { type: 'boolean' },
         confirmationText: { type: 'string' },
       },
@@ -831,6 +832,13 @@ function canonicalPreviewArgs(name, args) {
       merchantAddress: String(args.merchantAddress || '').toLowerCase(),
     }
   }
+  if (action === 'arcox_x402_pay_invoice') {
+    return {
+      action,
+      invoiceId: String(args.invoiceId || ''),
+      paymentId: String(args.paymentId || ''),
+    }
+  }
   return { action, ...args }
 }
 
@@ -1032,7 +1040,12 @@ async function rpcResponse(message) {
     if (name === 'arcox_pay_get_payment_status') return result(id, await payGetPaymentStatus(args))
     if (name === 'arcox_pay_list_recent_payments') return result(id, await payListRecentPayments(args))
     if (name === 'arcox_x402_invoice_status') return result(id, await x402InvoiceStatus(args))
-    if (name === 'arcox_x402_pay_invoice') return result(id, await runValueMovingTool(name, args, () => x402PayInvoice(args)))
+    if (name === 'arcox_x402_pay_invoice') {
+      if (args.confirmed !== true) return result(id, attachPreview(name, args, await x402PayInvoice(args)))
+      enforcePreview(name, args)
+      enforceSpendLimits(name, args)
+      return result(id, await runValueMovingTool(name, args, () => x402PayInvoice(args)))
+    }
     if (name === 'arcox_intel_quote_wallet_report') return result(id, await intelQuoteWalletReport(args))
     if (name === 'arcox_intel_execute_wallet_report') return result(id, await intelExecuteWalletReport(args))
     if (name === 'arcox_intel_get_address') return result(id, await intelGetAddress(args))
