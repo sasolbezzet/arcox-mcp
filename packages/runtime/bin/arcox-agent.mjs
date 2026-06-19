@@ -1020,8 +1020,8 @@ export function serviceCatalog() {
       { name: 'bridge', description: 'Quote and execute supported USDC CCTP testnet bridge routes; slow attestations may use auto-mint worker.' },
       { name: 'send', description: 'Quote and send supported Arc tokens from EOA or Circle wallet with confirmation.' },
       { name: 'bridge_retry', description: 'Retry mint for a completed burn transaction when attestation is ready.' },
-      { name: 'arcox_pay', description: 'Create/check sandbox NOWPayments and ARCOX Pay invoice/payment workflows.' },
-      { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode requires Arc Testnet USDC x402 payment proof.' },
+      { name: 'arcox_pay', description: 'Create/check internal ARCOX Pay invoice/payment workflows.' },
+      { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode requires Circle x402 invoice payment and webhook confirmation.' },
       { name: 'agentic_jobs', description: 'Plan/create/read/fund/submit/complete testnet Agentic Economy jobs.' },
     ],
     examplePrompts: [
@@ -1032,6 +1032,7 @@ export function serviceCatalog() {
       'quote swap 1 eurc to usdc',
       'create payment request 10 usdc to 0x...',
       'quote arkham wallet report for 0x...',
+      'check x402 invoice arcox_x402_...',
     ],
   }
 }
@@ -3127,63 +3128,24 @@ export async function quoteEcoRoutePayment(input = {}) {
   return postJson('/api/eco/route-preview', input)
 }
 
-export async function payCreateNowpaymentsSandboxPayment(input = {}) {
-  return payPostJson('/api/payments/nowpayments/create', {
-    amount: input.amount,
-    price_currency: input.price_currency || 'usd',
-    pay_currency: input.pay_currency || 'usdcbase',
-    order_id: input.order_id,
-    description: input.description,
-    user_id: input.user_id,
-    case: input.case,
-  })
-}
-
 export async function payGetPaymentStatus(input = {}) {
   const paymentId = String(input.payment_id || input.paymentId || '')
   if (!paymentId) throw new Error('payment_id is required.')
-  return payGetJson(`/api/payments/nowpayments/${encodeURIComponent(paymentId)}/status`)
-}
-
-export async function paySimulateUserArcPayment(input = {}) {
-  return payPostJson('/api/payments/nowpayments/simulate/user-arc-payment', {
-    payment_id: input.payment_id || input.paymentId,
-    user_wallet_address: input.user_wallet_address,
-    amount: input.amount,
-    arc_tx_hash: input.arc_tx_hash,
-  })
-}
-
-export async function paySimulateBridgeToBase(input = {}) {
-  return payPostJson('/api/payments/nowpayments/simulate/bridge-to-base', {
-    payment_id: input.payment_id || input.paymentId,
-    bridge_tx_hash: input.bridge_tx_hash,
-  })
-}
-
-export async function paySimulateBaseTreasurySend(input = {}) {
-  return payPostJson('/api/payments/nowpayments/simulate/base-treasury-send', {
-    payment_id: input.payment_id || input.paymentId,
-    base_tx_hash: input.base_tx_hash,
-  })
-}
-
-export async function paySimulateNowpaymentsFinished(input = {}) {
-  return payPostJson('/api/payments/nowpayments/simulate/finish', {
-    payment_id: input.payment_id || input.paymentId,
-  })
-}
-
-export async function paySimulateNowpaymentsStatus(input = {}) {
-  return payPostJson('/api/payments/nowpayments/simulate', {
-    payment_id: input.payment_id || input.paymentId,
-    order_id: input.order_id,
-    payment_status: input.payment_status,
-  })
+  return {
+    status: 'disabled',
+    paymentId,
+    reason: 'Legacy provider payment status is disabled. x402 now uses internal ARCOX invoices and Circle transactions.inbound webhook.',
+    safeNextStep: 'Use arcox_x402_invoice_status with invoiceId or paymentId.',
+  }
 }
 
 export async function payListRecentPayments(input = {}) {
-  return payGetJson(`/api/payments/nowpayments/recent?limit=${encodeURIComponent(String(input.limit || 10))}`)
+  return {
+    status: 'disabled',
+    reason: 'Legacy provider payment history is disabled. x402 now uses internal ARCOX invoices and Circle transactions.inbound webhooks.',
+    safeNextStep: 'Use arcox_x402_invoice_status for paid Intel invoices, or arcox_get_payment_request for ARCOX Pay invoices.',
+    limit: input.limit || 10,
+  }
 }
 
 export async function x402InvoiceStatus(input = {}) {
@@ -3203,14 +3165,14 @@ export async function intelQuoteWalletReport(input = {}) {
     asset: 'USDC',
     network: 'arc-testnet',
     requiresUserConfirmation: true,
-    instruction: 'This Arkham analysis costs 0.05 USDC on Arc. Continue?',
+    instruction: 'This Arkham analysis requires an ARCOX x402 invoice. First request returns exact USDC amount and Circle treasury address. Continue?',
     backend: ARCOX_API_BASE_URL,
     arkhamApiKeyStoredInMcp: false,
   }
 }
 
 export async function intelExecuteWalletReport(input = {}) {
-  if (input.confirmed !== true || !isSimpleConfirmationText(input.confirmationText)) {
+  if (!input.paymentId && (input.confirmed !== true || !isSimpleConfirmationText(input.confirmationText))) {
     return intelQuoteWalletReport(input)
   }
   const address = String(input.address || '').trim()

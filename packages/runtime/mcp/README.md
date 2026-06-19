@@ -49,7 +49,7 @@ Tools:
 - `arcox_execute_swap`: executes a confirmed Arc swap. EOA uses local `AGENT_PRIVATE_KEY` to sign approve and Circle AppKit adapter execute transactions. Without `confirmed: true`, it returns a quote only.
 - `arcox_create_payment_request`: creates an ARCOX Pay public USDC invoice/payment link on Arc Testnet.
 - `arcox_get_payment_request`, `arcox_quote_payment_request`, `arcox_pay_payment_request`, `arcox_check_payment_status`: read, quote, pay, and track ARCOX Pay invoices.
-- `arcox_pay_create_nowpayments_sandbox_payment`, `arcox_pay_get_payment_status`, and `arcox_pay_simulate_*`: create and test the ARCOX Pay NOWPayments sandbox flow without moving real funds.
+- `arcox_x402_invoice_status`: checks internal ARCOX x402 invoices paid by Circle inbound webhook.
 - `arcox_intel_quote_wallet_report`, `arcox_intel_execute_wallet_report`, `arcox_intel_get_address`, `arcox_intel_get_tx`, `arcox_intel_get_contract`, `arcox_intel_get_entity`, `arcox_intel_get_token`, `arcox_intel_search`: request ARCOX Intel via ARCOX API/x402. MCP does not store `ARKHAM_API_KEY`.
 - `arcox_agent_job`: plans and executes Agentic Economy operations: register agent, create/read job, set budget, fund, submit, and complete.
 
@@ -59,5 +59,5 @@ Execution safety:
 - Execute tools only submit transactions when `confirmed: true`.
 - EOA execution uses the local `AGENT_PRIVATE_KEY` in `arcox-agent/.env`.
 - Circle proxy wallet actions use the ARCOX backend auth session signed by the local agent key and must be explicitly requested with `source="circle"`.
-- Circle for Agents/x402 support is readiness only. ARCOX Pay invoices are public USDC payment links, not live gas-free nanopayments.
+- ARCOX Intel x402 uses internal invoices and Circle `transactions.inbound` webhook confirmation. MCP never asks users to submit a txHash manually.
 - Browser-wallet signing from the Web UI remains separate from terminal/MCP execution.
