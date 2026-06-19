@@ -43,6 +43,7 @@ import {
   transactionHistory,
   walletBalances,
   x402InvoiceStatus,
+  x402PayInvoice,
 } from '../bin/arcox-agent.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -404,6 +405,20 @@ const tools = [
     },
   },
   {
+    name: 'arcox_x402_pay_invoice',
+    description: 'Pay an internal ARCOX x402 invoice with the local EOA agent wallet. Requires explicit confirmation; does not submit txHash to backend.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string' },
+        paymentId: { type: 'string' },
+        confirmed: { type: 'boolean' },
+        confirmationText: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'arcox_intel_execute_wallet_report',
     description: 'Execute an ARCOX Intel full wallet report through the ARCOX API backend after explicit user confirmation. MCP does not call Arkham directly.',
     inputSchema: {
@@ -695,7 +710,7 @@ async function agentJob(args) {
   throw new Error(`Unsupported agent job operation: ${args.operation}`)
 }
 
-const valueMovingTools = new Set(['arcox_execute_bridge', 'arcox_execute_send', 'arcox_execute_swap', 'arcox_pay_payment_request'])
+const valueMovingTools = new Set(['arcox_execute_bridge', 'arcox_execute_send', 'arcox_execute_swap', 'arcox_pay_payment_request', 'arcox_x402_pay_invoice'])
 const valueMovingJobOps = new Set(['register-agent', 'create-job', 'set-budget', 'fund', 'submit', 'complete'])
 const rateLimitBuckets = new Map()
 const RATE_LIMIT_WINDOW_MS = 60_000
@@ -736,6 +751,7 @@ function spendAmountFor(name, args) {
   if (name.includes('swap')) return Number(args.amountIn || args.amount || 0)
   if (name.includes('send') || name.includes('bridge')) return Number(args.amount || 0)
   if (name === 'arcox_pay_payment_request') return Number(args.amount || 0)
+  if (name === 'arcox_x402_pay_invoice') return Number(args.amount || 0)
   if (name === 'arcox_agent_job') return Number(args.amount || 0)
   return 0
 }
@@ -1016,6 +1032,7 @@ async function rpcResponse(message) {
     if (name === 'arcox_pay_get_payment_status') return result(id, await payGetPaymentStatus(args))
     if (name === 'arcox_pay_list_recent_payments') return result(id, await payListRecentPayments(args))
     if (name === 'arcox_x402_invoice_status') return result(id, await x402InvoiceStatus(args))
+    if (name === 'arcox_x402_pay_invoice') return result(id, await runValueMovingTool(name, args, () => x402PayInvoice(args)))
     if (name === 'arcox_intel_quote_wallet_report') return result(id, await intelQuoteWalletReport(args))
     if (name === 'arcox_intel_execute_wallet_report') return result(id, await intelExecuteWalletReport(args))
     if (name === 'arcox_intel_get_address') return result(id, await intelGetAddress(args))

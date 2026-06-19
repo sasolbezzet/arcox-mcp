@@ -3154,6 +3154,61 @@ export async function x402InvoiceStatus(input = {}) {
   return arcoxApiGetJson(`/api/x402/invoices/${encodeURIComponent(invoiceId)}/status`)
 }
 
+export async function x402PayInvoice(input = {}) {
+  const invoiceId = String(input.invoiceId || input.paymentId || '').trim()
+  if (!invoiceId) throw new Error('invoiceId or paymentId is required.')
+  const status = await x402InvoiceStatus({ invoiceId })
+  const invoice = status.x402 || status.invoice
+  if (!invoice) throw new Error('x402 invoice not found.')
+  if (invoice.status === 'paid') return { status: 'paid', invoice, alreadyPaid: true }
+  if (invoice.status !== 'pending') throw new Error(`x402 invoice status is ${invoice.status}.`)
+  if (invoice.asset !== 'USDC') throw new Error('Only USDC x402 invoices are supported.')
+  if (!invoice.recipient || !String(invoice.recipient).startsWith('0x')) throw new Error('x402 invoice recipient is invalid.')
+  const amount = String(invoice.amount || invoice.uniqueAmount || '')
+  const amountUnits = parseUnits(amount, 6)
+  const max = Number(process.env.ARCOX_MAX_TX_USDC || '10')
+  if (max > 0 && Number(amount) > max) throw new Error(`x402 payment exceeds ARCOX_MAX_TX_USDC=${max}.`)
+  if (input.confirmed !== true || !isSimpleConfirmationText(input.confirmationText)) {
+    return {
+      status: 'preview',
+      requiresUserConfirmation: true,
+      invoice,
+      payer: wallet().account.address,
+      amount,
+      token: 'USDC',
+      recipient: invoice.recipient,
+      instruction: `Confirm to pay ${amount} USDC to ${invoice.recipient} for ${invoice.invoiceId}.`,
+    }
+  }
+  const { account, walletClient } = wallet()
+  const balance = await publicClient.readContract({ address: ARC_USDC, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }).catch(() => 0n)
+  if (balance < amountUnits) throw new Error(`Insufficient USDC. Balance ${formatUnits(balance, 6)}, need ${amount}.`)
+  const txHash = await walletClient.writeContract({
+    address: ARC_USDC,
+    abi: erc20Abi,
+    functionName: 'transfer',
+    args: [getAddress(invoice.recipient), amountUnits],
+  })
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 45_000 }).catch(() => null)
+  if (receipt?.status === 'reverted') throw new Error(`x402 USDC payment reverted: ${txHash}`)
+  let latest = invoice
+  for (let i = 0; i < 18; i++) {
+    await sleep(5000)
+    const next = await x402InvoiceStatus({ invoiceId })
+    latest = next.x402 || next.invoice || latest
+    if (latest.status === 'paid') break
+  }
+  return {
+    status: latest.status === 'paid' ? 'paid' : 'pending_webhook',
+    invoice: latest,
+    txHash,
+    explorer: `${EXPLORER_TX}${txHash}`,
+    safeNextStep: latest.status === 'paid'
+      ? 'Retry the Intel request with this paymentId to get the Arkham result.'
+      : 'USDC transfer submitted. Wait for Circle transactions.inbound webhook, then check invoice status again.',
+  }
+}
+
 export async function intelQuoteWalletReport(input = {}) {
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
@@ -3177,7 +3232,13 @@ export async function intelExecuteWalletReport(input = {}) {
   }
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: input.paymentId }, 60_000)
+  if (input.paymentId) return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: input.paymentId }, 60_000)
+  const first = await arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, {}, 60_000)
+  const invoice = first.x402 || first.invoice
+  if (!first.paymentRequired || !invoice?.invoiceId) return first
+  const payment = await x402PayInvoice({ invoiceId: invoice.invoiceId, confirmed: true, confirmationText: input.confirmationText || 'yes' })
+  if (payment.status !== 'paid') return { status: 'payment_pending', payment, invoice: payment.invoice }
+  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: payment.invoice.paymentId }, 60_000)
 }
 
 export async function intelGetAddress(input = {}) {
