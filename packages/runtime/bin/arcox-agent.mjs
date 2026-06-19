@@ -3241,41 +3241,58 @@ export async function intelExecuteWalletReport(input = {}) {
   return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: payment.invoice.paymentId }, 60_000)
 }
 
+async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
+  if (input.paymentId) return arcoxApiGetJson(path, { paymentId: input.paymentId }, timeoutMs)
+  const first = await arcoxApiGetJson(path, {}, timeoutMs)
+  const invoice = first.x402 || first.invoice
+  if (!first.paymentRequired || !invoice?.invoiceId) return first
+  if (input.confirmed !== true || !isSimpleConfirmationText(input.confirmationText)) {
+    return {
+      ...first,
+      requiresUserConfirmation: true,
+      instruction: `Confirm to let the local ARCOX agent pay ${invoice.amount || invoice.uniqueAmount} USDC for this Intel request, then retry this same tool with confirmed=true and confirmationText=yes.`,
+    }
+  }
+  const payment = await x402PayInvoice({ invoiceId: invoice.invoiceId, confirmed: true, confirmationText: input.confirmationText })
+  if (payment.status !== 'paid') return { status: 'payment_pending', payment, invoice: payment.invoice }
+  return arcoxApiGetJson(path, { paymentId: payment.invoice.paymentId }, timeoutMs)
+}
+
 export async function intelGetAddress(input = {}) {
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  return arcoxApiGetJson(`/api/intel/address/${encodeURIComponent(address)}`, { paymentId: input.paymentId })
+  return paidIntelRequest(`/api/intel/address/${encodeURIComponent(address)}`, input)
 }
 
 export async function intelGetTx(input = {}) {
   const hash = String(input.hash || input.txHash || '').trim()
   if (!hash) throw new Error('hash is required.')
-  return arcoxApiGetJson(`/api/intel/tx/${encodeURIComponent(hash)}`, { paymentId: input.paymentId })
+  return paidIntelRequest(`/api/intel/tx/${encodeURIComponent(hash)}`, input)
 }
 
 export async function intelGetContract(input = {}) {
   const chain = String(input.chain || '').trim()
   const address = String(input.address || '').trim()
   if (!chain || !address) throw new Error('chain and address are required.')
-  return arcoxApiGetJson(`/api/intel/contract/${encodeURIComponent(chain)}/${encodeURIComponent(address)}`, { paymentId: input.paymentId })
+  return paidIntelRequest(`/api/intel/contract/${encodeURIComponent(chain)}/${encodeURIComponent(address)}`, input)
 }
 
 export async function intelGetEntity(input = {}) {
   const entity = String(input.entity || '').trim()
   if (!entity) throw new Error('entity is required.')
-  return arcoxApiGetJson(`/api/intel/entity/${encodeURIComponent(entity)}`, { paymentId: input.paymentId })
+  return paidIntelRequest(`/api/intel/entity/${encodeURIComponent(entity)}`, input)
 }
 
 export async function intelGetToken(input = {}) {
   const token = String(input.token || input.id || '').trim()
   if (!token) throw new Error('token is required.')
-  return arcoxApiGetJson(`/api/intel/token/${encodeURIComponent(token)}`, { paymentId: input.paymentId })
+  return paidIntelRequest(`/api/intel/token/${encodeURIComponent(token)}`, input)
 }
 
 export async function intelSearch(input = {}) {
   const query = String(input.q || input.query || '').trim()
   if (!query) throw new Error('query is required.')
-  return arcoxApiGetJson(`/api/intel/search?q=${encodeURIComponent(query)}`, { paymentId: input.paymentId })
+  return paidIntelRequest(`/api/intel/search?q=${encodeURIComponent(query)}`, input)
 }
 
 function isSimpleConfirmationText(value) {

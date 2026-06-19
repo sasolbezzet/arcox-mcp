@@ -436,10 +436,10 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_address',
-    description: 'Get address intelligence through ARCOX API. Returns an internal x402 invoice; retry with paymentId after Circle webhook marks it paid.',
+    description: 'Get address intelligence through ARCOX API. If x402 is required, preview first; after explicit confirmation this tool can pay with the local EOA agent wallet and return the result.',
     inputSchema: {
       type: 'object',
-      properties: { address: { type: 'string' }, paymentId: { type: 'string' } },
+      properties: { address: { type: 'string' }, paymentId: { type: 'string' }, confirmed: { type: 'boolean' }, confirmationText: { type: 'string' } },
       required: ['address'],
       additionalProperties: false,
     },
@@ -449,7 +449,7 @@ const tools = [
     description: 'Get transaction intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { hash: { type: 'string' }, paymentId: { type: 'string' } },
+      properties: { hash: { type: 'string' }, paymentId: { type: 'string' }, confirmed: { type: 'boolean' }, confirmationText: { type: 'string' } },
       required: ['hash'],
       additionalProperties: false,
     },
@@ -459,7 +459,7 @@ const tools = [
     description: 'Get contract intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { chain: { type: 'string' }, address: { type: 'string' }, paymentId: { type: 'string' } },
+      properties: { chain: { type: 'string' }, address: { type: 'string' }, paymentId: { type: 'string' }, confirmed: { type: 'boolean' }, confirmationText: { type: 'string' } },
       required: ['chain', 'address'],
       additionalProperties: false,
     },
@@ -469,7 +469,7 @@ const tools = [
     description: 'Get entity intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { entity: { type: 'string' }, paymentId: { type: 'string' } },
+      properties: { entity: { type: 'string' }, paymentId: { type: 'string' }, confirmed: { type: 'boolean' }, confirmationText: { type: 'string' } },
       required: ['entity'],
       additionalProperties: false,
     },
@@ -479,7 +479,7 @@ const tools = [
     description: 'Get token intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { token: { type: 'string' }, paymentId: { type: 'string' } },
+      properties: { token: { type: 'string' }, paymentId: { type: 'string' }, confirmed: { type: 'boolean' }, confirmationText: { type: 'string' } },
       required: ['token'],
       additionalProperties: false,
     },
@@ -489,7 +489,7 @@ const tools = [
     description: 'Search Arkham intelligence through ARCOX API.',
     inputSchema: {
       type: 'object',
-      properties: { query: { type: 'string' }, paymentId: { type: 'string' } },
+      properties: { query: { type: 'string' }, paymentId: { type: 'string' }, confirmed: { type: 'boolean' }, confirmationText: { type: 'string' } },
       required: ['query'],
       additionalProperties: false,
     },
