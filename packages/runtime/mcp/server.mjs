@@ -1040,6 +1040,13 @@ async function rpcResponse(message) {
     if (name === 'arcox_x402_invoice_status') return result(id, await x402InvoiceStatus(args))
     if (name === 'arcox_x402_pay_invoice') {
       if (args.confirmed !== true) return result(id, attachPreview(name, args, await x402PayInvoice(args)))
+      if (!args.previewId) {
+        return result(id, {
+          status: 'preview_required',
+          requiresUserConfirmation: true,
+          safeNextStep: 'Call arcox_x402_pay_invoice again without confirmed to get a previewId. Show that preview to the user. After the user replies yes, execute with confirmed=true, previewId, and confirmationText.',
+        })
+      }
       enforcePreview(name, args)
       enforceSpendLimits(name, args)
       return result(id, await runValueMovingTool(name, args, () => x402PayInvoice({ ...args, mcpPreviewVerified: true })))
