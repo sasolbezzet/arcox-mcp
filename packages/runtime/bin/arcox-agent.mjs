@@ -3238,7 +3238,8 @@ export async function intelExecuteWalletReport(input = {}) {
   if (!first.paymentRequired || !invoice?.invoiceId) return first
   const payment = await x402PayInvoice({ invoiceId: invoice.invoiceId, confirmed: true, confirmationText: input.confirmationText || 'yes' })
   if (payment.status !== 'paid') return { status: 'payment_pending', payment, invoice: payment.invoice }
-  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: payment.invoice.paymentId }, 60_000)
+  const data = await arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: payment.invoice.paymentId }, 60_000)
+  return { ...data, x402Payment: { ...payment.invoice, txHash: payment.invoice.txHash || payment.txHash, explorer: payment.explorer } }
 }
 
 async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
@@ -3255,7 +3256,8 @@ async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
   }
   const payment = await x402PayInvoice({ invoiceId: invoice.invoiceId, confirmed: true, confirmationText: input.confirmationText })
   if (payment.status !== 'paid') return { status: 'payment_pending', payment, invoice: payment.invoice }
-  return arcoxApiGetJson(path, { paymentId: payment.invoice.paymentId }, timeoutMs)
+  const data = await arcoxApiGetJson(path, { paymentId: payment.invoice.paymentId }, timeoutMs)
+  return { ...data, x402Payment: { ...payment.invoice, txHash: payment.invoice.txHash || payment.txHash, explorer: payment.explorer } }
 }
 
 export async function intelGetAddress(input = {}) {
