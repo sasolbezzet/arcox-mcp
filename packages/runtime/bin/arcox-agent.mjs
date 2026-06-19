@@ -3227,19 +3227,12 @@ export async function intelQuoteWalletReport(input = {}) {
 }
 
 export async function intelExecuteWalletReport(input = {}) {
-  if (!input.paymentId && (input.confirmed !== true || !isSimpleConfirmationText(input.confirmationText))) {
+  if (!input.paymentId) {
     return intelQuoteWalletReport(input)
   }
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  if (input.paymentId) return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: input.paymentId }, 60_000)
-  const first = await arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, {}, 60_000)
-  const invoice = first.x402 || first.invoice
-  if (!first.paymentRequired || !invoice?.invoiceId) return first
-  const payment = await x402PayInvoice({ invoiceId: invoice.invoiceId, confirmed: true, confirmationText: input.confirmationText || 'yes' })
-  if (payment.status !== 'paid') return { status: 'payment_pending', payment, invoice: payment.invoice }
-  const data = await arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: payment.invoice.paymentId }, 60_000)
-  return { ...data, x402Payment: { ...payment.invoice, txHash: payment.invoice.txHash || payment.txHash, explorer: payment.explorer } }
+  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: input.paymentId }, 60_000)
 }
 
 async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
@@ -3247,17 +3240,11 @@ async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
   const first = await arcoxApiGetJson(path, {}, timeoutMs)
   const invoice = first.x402 || first.invoice
   if (!first.paymentRequired || !invoice?.invoiceId) return first
-  if (input.confirmed !== true || !isSimpleConfirmationText(input.confirmationText)) {
-    return {
-      ...first,
-      requiresUserConfirmation: true,
-      instruction: `Confirm to let the local ARCOX agent pay ${invoice.amount || invoice.uniqueAmount} USDC for this Intel request, then retry this same tool with confirmed=true and confirmationText=yes.`,
-    }
+  return {
+    ...first,
+    requiresUserConfirmation: true,
+    instruction: `This Intel request requires x402 payment. First call arcox_x402_pay_invoice with invoiceId=${invoice.invoiceId} to show the payment preview. After the user confirms that payment preview, execute arcox_x402_pay_invoice with confirmed=true, previewId, and confirmationText. Then retry this Intel tool with paymentId=${invoice.paymentId}.`,
   }
-  const payment = await x402PayInvoice({ invoiceId: invoice.invoiceId, confirmed: true, confirmationText: input.confirmationText })
-  if (payment.status !== 'paid') return { status: 'payment_pending', payment, invoice: payment.invoice }
-  const data = await arcoxApiGetJson(path, { paymentId: payment.invoice.paymentId }, timeoutMs)
-  return { ...data, x402Payment: { ...payment.invoice, txHash: payment.invoice.txHash || payment.txHash, explorer: payment.explorer } }
 }
 
 export async function intelGetAddress(input = {}) {
