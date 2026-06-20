@@ -3253,12 +3253,9 @@ export async function intelQuoteWalletReport(input = {}) {
 }
 
 export async function intelExecuteWalletReport(input = {}) {
-  if (!input.paymentId) {
-    return intelQuoteWalletReport(input)
-  }
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  return arcoxApiGetJson(`/api/intel/report/address/${encodeURIComponent(address)}`, { paymentId: input.paymentId }, 60_000)
+  return paidIntelRequest(`/api/intel/report/address/${encodeURIComponent(address)}`, input, 60_000)
 }
 
 async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
@@ -3276,13 +3273,28 @@ async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
 export async function intelGetAddress(input = {}) {
   const address = String(input.address || '').trim()
   if (!address) throw new Error('address is required.')
-  return paidIntelRequest(`/api/intel/address/${encodeURIComponent(address)}`, input)
+  const service = normalizeIntelService(input.service)
+  const suffixes = {
+    basic: '',
+    all: '/all',
+    enriched: '/enriched',
+    balances: '/balances',
+    counterparties: '/counterparties',
+    flows: '/flows',
+    history: '/history',
+    volume: '/volume',
+    portfolio: '/portfolio',
+  }
+  if (!(service in suffixes)) throw new Error(`Unsupported address intel service: ${service}.`)
+  return paidIntelRequest(`/api/intel/address/${encodeURIComponent(address)}${suffixes[service]}`, input)
 }
 
 export async function intelGetTx(input = {}) {
   const hash = String(input.hash || input.txHash || '').trim()
   if (!hash) throw new Error('hash is required.')
-  return paidIntelRequest(`/api/intel/tx/${encodeURIComponent(hash)}`, input)
+  const service = normalizeIntelService(input.service)
+  if (service !== 'basic' && service !== 'transfers') throw new Error(`Unsupported transaction intel service: ${service}.`)
+  return paidIntelRequest(`/api/intel/tx/${encodeURIComponent(hash)}${service === 'transfers' ? '/transfers' : ''}`, input)
 }
 
 export async function intelGetContract(input = {}) {
@@ -3295,13 +3307,37 @@ export async function intelGetContract(input = {}) {
 export async function intelGetEntity(input = {}) {
   const entity = String(input.entity || '').trim()
   if (!entity) throw new Error('entity is required.')
-  return paidIntelRequest(`/api/intel/entity/${encodeURIComponent(entity)}`, input)
+  const service = normalizeIntelService(input.service)
+  const suffixes = {
+    basic: '',
+    summary: '/summary',
+    balances: '/balances',
+    flows: '/flows',
+  }
+  if (!(service in suffixes)) throw new Error(`Unsupported entity intel service: ${service}.`)
+  return paidIntelRequest(`/api/intel/entity/${encodeURIComponent(entity)}${suffixes[service]}`, input)
 }
 
 export async function intelGetToken(input = {}) {
+  const service = normalizeIntelService(input.service)
+  if (service === 'trending') return paidIntelRequest('/api/intel/token/trending', input)
+  if (service === 'top') return paidIntelRequest('/api/intel/token/top', input)
+  if (service === 'contract' || service === 'contract-holders') {
+    const chain = String(input.chain || '').trim()
+    const address = String(input.address || input.token || '').trim()
+    if (!chain || !address) throw new Error('chain and address are required for token contract intel.')
+    return paidIntelRequest(`/api/intel/token/${encodeURIComponent(chain)}/${encodeURIComponent(address)}${service === 'contract-holders' ? '/holders' : ''}`, input)
+  }
   const token = String(input.token || input.id || '').trim()
   if (!token) throw new Error('token is required.')
-  return paidIntelRequest(`/api/intel/token/${encodeURIComponent(token)}`, input)
+  const suffixes = {
+    basic: '',
+    market: '/market',
+    holders: '/holders',
+    'top-flow': '/top-flow',
+  }
+  if (!(service in suffixes)) throw new Error(`Unsupported token intel service: ${service}.`)
+  return paidIntelRequest(`/api/intel/token/${encodeURIComponent(token)}${suffixes[service]}`, input)
 }
 
 export async function intelSearch(input = {}) {
@@ -3313,6 +3349,10 @@ export async function intelSearch(input = {}) {
 function isSimpleConfirmationText(value) {
   const text = String(value || '').trim().toLowerCase()
   return text === 'yes' || text === 'ya'
+}
+
+function normalizeIntelService(value) {
+  return String(value || 'basic').trim().toLowerCase().replace(/_/g, '-')
 }
 
 function readAutoMintStatuses() {

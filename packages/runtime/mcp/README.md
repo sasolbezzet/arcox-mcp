@@ -51,12 +51,16 @@ Tools:
 - `arcox_get_payment_request`, `arcox_quote_payment_request`, `arcox_pay_payment_request`, `arcox_check_payment_status`: read, quote, pay, and track ARCOX Pay invoices.
 - `arcox_x402_invoice_status`: checks internal ARCOX x402 invoices paid by Circle inbound webhook.
 - `arcox_intel_quote_wallet_report`, `arcox_intel_execute_wallet_report`, `arcox_intel_get_address`, `arcox_intel_get_tx`, `arcox_intel_get_contract`, `arcox_intel_get_entity`, `arcox_intel_get_token`, `arcox_intel_search`: request ARCOX Intel via ARCOX API/x402. MCP does not store `ARKHAM_API_KEY`.
+  - `arcox_intel_get_address.service`: `basic`, `all`, `enriched`, `balances`, `counterparties`, `flows`, `history`, `volume`, `portfolio`.
+  - `arcox_intel_get_tx.service`: `basic`, `transfers`.
+  - `arcox_intel_get_entity.service`: `basic`, `summary`, `balances`, `flows`.
+  - `arcox_intel_get_token.service`: `basic`, `market`, `holders`, `top-flow`, `trending`, `top`, `contract`, `contract-holders`.
 - `arcox_agent_job`: plans and executes Agentic Economy operations: register agent, create/read job, set budget, fund, submit, and complete.
 
 Execution safety:
 
 - Value-moving tools must be called first as quote/preview.
-- Execute tools only submit transactions when `confirmed: true`.
+- Execute tools only submit transactions when `confirmed: true`, a valid `previewId` is supplied, and the user confirmation text is exactly `yes` or `ya`.
 - EOA execution uses the local `AGENT_PRIVATE_KEY` in `arcox-agent/.env`.
 - Circle proxy wallet actions use the ARCOX backend auth session signed by the local agent key and must be explicitly requested with `source="circle"`.
 - ARCOX Intel x402 uses internal invoices and Circle `transactions.inbound` webhook confirmation. MCP never asks users to submit a txHash manually.

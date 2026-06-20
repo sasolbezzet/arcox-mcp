@@ -135,7 +135,7 @@ All value-moving tools require a quote/preview first:
 
 1. Call quote tool.
 2. Show preview to the user.
-3. User confirms with `yes`, `ya`, `confirm`, `konfirmasi`, `lanjut`, or `ok`.
+3. User confirms with exactly `yes` or `ya`.
 4. Call execute tool with `confirmed=true`, the exact `previewId`, and `confirmationText`.
 
 The agent must not skip the preview step.
@@ -165,6 +165,13 @@ The agent must not skip the preview step.
 - `arcox_read_doc`
 - `arcox_agent_status`
 - `arcox_agent_job`
+
+ARCOX Intel x402 service coverage:
+
+- `arcox_intel_get_address` supports `service`: `basic`, `all`, `enriched`, `balances`, `counterparties`, `flows`, `history`, `volume`, `portfolio`.
+- `arcox_intel_get_tx` supports `service`: `basic`, `transfers`.
+- `arcox_intel_get_entity` supports `service`: `basic`, `summary`, `balances`, `flows`.
+- `arcox_intel_get_token` supports `service`: `basic`, `market`, `holders`, `top-flow`, `trending`, `top`, `contract`, `contract-holders`.
 
 ## Circle Gateway Nanopayments Readiness
 
