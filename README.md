@@ -173,6 +173,8 @@ ARCOX Intel x402 service coverage:
 - `arcox_intel_get_entity` supports `service`: `basic`, `summary`, `balances`, `flows`.
 - `arcox_intel_get_token` supports `service`: `basic`, `market`, `holders`, `top-flow`, `trending`, `top`, `contract`, `contract-holders`.
 
+ARCOX Intel x402 payments use Arc transaction memos. The agent pays USDC through the Arc Memo contract, attaching the invoice/payment reference on-chain for reconciliation.
+
 ## Circle Gateway Nanopayments Readiness
 
 ARCOX MCP understands Circle Gateway Nanopayments as a future x402 rail:

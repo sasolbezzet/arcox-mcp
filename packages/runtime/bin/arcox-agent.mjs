@@ -52,6 +52,7 @@ const EXPLORER_TX = 'https://testnet.arcscan.app/tx/'
 const AGENTIC_COMMERCE_CONTRACT = '0x0747EEf0706327138c69792bF28Cd525089e4583'
 const IDENTITY_REGISTRY = '0x8004A818BFB912233c491871b3d84c89A494BD9e'
 const ARC_USDC = '0x3600000000000000000000000000000000000000'
+const ARC_MEMO_CONTRACT = process.env.ARC_MEMO_CONTRACT || '0x5294E9927c3306DcBaDb03fe70b92e01cCede505'
 const TOKEN_MESSENGER_V2_EVM = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA'
 const MESSAGE_TRANSMITTER_V2_EVM = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275'
 const IRIS = 'https://iris-api-sandbox.circle.com'
@@ -141,6 +142,19 @@ const adapterExecuteAbi = [
     outputs: [],
   },
 ]
+
+const memoAbi = [{
+  type: 'function',
+  name: 'memo',
+  stateMutability: 'nonpayable',
+  inputs: [
+    { name: 'target', type: 'address' },
+    { name: 'data', type: 'bytes' },
+    { name: 'memoId', type: 'bytes32' },
+    { name: 'memoData', type: 'bytes' },
+  ],
+  outputs: [],
+}]
 
 const arcTestnet = defineChain({
   id: 5042002,
@@ -3195,7 +3209,9 @@ export async function x402PayInvoice(input = {}) {
       amount,
       token: 'USDC',
       recipient: invoice.recipient,
-      instruction: `Confirm to pay ${amount} USDC to ${invoice.recipient} for ${invoice.invoiceId}.`,
+      memoContract: invoice.memoContract || ARC_MEMO_CONTRACT,
+      memoId: invoice.memoId,
+      instruction: `Confirm to pay ${amount} USDC to ${invoice.recipient} for ${invoice.invoiceId} using Arc transaction memo.`,
     }
   }
   if (input.mcpPreviewVerified !== true) {
@@ -3204,11 +3220,24 @@ export async function x402PayInvoice(input = {}) {
   const { account, walletClient } = wallet()
   const balance = await publicClient.readContract({ address: ARC_USDC, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }).catch(() => 0n)
   if (balance < amountUnits) throw new Error(`Insufficient USDC. Balance ${formatUnits(balance, 6)}, need ${amount}.`)
-  const txHash = await walletClient.writeContract({
-    address: ARC_USDC,
+  const transferData = encodeFunctionData({
     abi: erc20Abi,
     functionName: 'transfer',
     args: [getAddress(invoice.recipient), amountUnits],
+  })
+  const memoId = invoice.memoId || keccak256(toHex(String(invoice.paymentId || invoice.invoiceId)))
+  const memoData = invoice.memoData || toHex(JSON.stringify({
+    app: 'arcox',
+    type: 'x402',
+    invoiceId: invoice.invoiceId,
+    paymentId: invoice.paymentId,
+    resource: invoice.resource,
+  }))
+  const txHash = await walletClient.writeContract({
+    address: invoice.memoContract || ARC_MEMO_CONTRACT,
+    abi: memoAbi,
+    functionName: 'memo',
+    args: [ARC_USDC, transferData, memoId, memoData],
   })
   const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 45_000 }).catch(() => null)
   if (receipt?.status === 'reverted') throw new Error(`x402 USDC payment reverted: ${txHash}`)
@@ -3228,6 +3257,8 @@ export async function x402PayInvoice(input = {}) {
     invoice: latest,
     txHash,
     explorer,
+    memoId,
+    memoContract: invoice.memoContract || ARC_MEMO_CONTRACT,
     unlockedResult,
     safeNextStep: latest.status === 'paid'
       ? 'Paid. If unlockedResult is present, return it to the user immediately.'
