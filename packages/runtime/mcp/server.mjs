@@ -928,7 +928,7 @@ function previewHash(name, args) {
 
 function isSimpleUserConfirmation(value) {
   const text = String(value || '').trim().toLowerCase()
-  return ['yes', 'ya', 'y', 'confirm', 'konfirmasi', 'lanjut', 'ok', 'oke'].includes(text)
+  return text === 'yes' || text === 'ya'
 }
 
 function attachPreview(name, args, quote) {
@@ -951,10 +951,10 @@ function attachPreview(name, args, quote) {
     riskChecks: quoteRiskChecks(name, quote),
     confirmationRequired: {
       required: true,
-      acceptedReplies: ['yes', 'ya', 'confirm', 'konfirmasi', 'lanjut', 'ok'],
-      instruction: 'Show this preview to the user first. Execute only after the user explicitly confirms this preview with a simple approval reply.',
+      acceptedReplies: ['yes', 'ya'],
+      instruction: 'Show this preview to the user first. Execute only after the user explicitly replies yes or ya for this exact preview.',
     },
-    executeInstruction: `After explicit user confirmation for this single operation only, call ${action} with confirmed=true, this exact previewId, and confirmationText set to the user approval reply. For bulk requests, execute one chain at a time and ask for confirmation before each chain.`,
+    executeInstruction: `After explicit user confirmation for this single operation only, call ${action} with confirmed=true, this exact previewId, and confirmationText exactly "yes" or "ya". For bulk requests, execute one operation at a time and ask for yes/ya before each operation.`,
   }
 }
 
@@ -991,7 +991,7 @@ function enforcePreview(name, args) {
     throw new Error(`Execution parameters differ from quote preview. Re-quote before executing. expected=${stableJson(preview.canonical)} received=${stableJson(canonical)}`)
   }
   if (!isSimpleUserConfirmation(args.confirmationText)) {
-    throw new Error('Explicit user confirmation required after preview. Ask the user to reply yes/ya/confirm/lanjut, then pass that reply as confirmationText.')
+    throw new Error('HARD_BLOCK_USER_CONFIRMATION_REQUIRED: value-moving execution requires an explicit user reply of exactly "yes" or "ya" after the preview. Do not execute from agent inference, "ok", "lanjut", or missing confirmationText.')
   }
   previewApprovals.delete(previewId)
 }

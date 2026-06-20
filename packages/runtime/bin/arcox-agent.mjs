@@ -3311,7 +3311,8 @@ export async function intelSearch(input = {}) {
 }
 
 function isSimpleConfirmationText(value) {
-  return ['yes', 'ya', 'y', 'confirm', 'konfirmasi', 'lanjut', 'ok', 'oke'].includes(String(value || '').trim().toLowerCase())
+  const text = String(value || '').trim().toLowerCase()
+  return text === 'yes' || text === 'ya'
 }
 
 function readAutoMintStatuses() {
