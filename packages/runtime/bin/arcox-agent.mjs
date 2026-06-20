@@ -196,11 +196,13 @@ function apiArcTokenKey(value, fallback = 'USDC') {
 
 function swapRouteUnavailableQuote(error) {
   const message = error?.message || String(error || '')
-  if (!/NO_SWAP_ROUTE|Route swap belum tersedia|No route available|Route or resource not found|Swap route not found|route is not supported/i.test(message)) return null
+  if (!/NO_SWAP_ROUTE|CIRCLE_SCA_ROUTE_UNAVAILABLE|Route swap belum tersedia|No route available|Route or resource not found|Swap route not found|route is not supported|Circle wallet route .*belum aman/i.test(message)) return null
   return {
     available: false,
-    code: 'NO_SWAP_ROUTE',
-    error: 'Route swap belum tersedia dari Circle Stablecoin Service untuk pasangan/jumlah ini. Coba jumlah lebih besar, atau ulangi beberapa menit lagi.',
+    code: /Circle wallet route/i.test(message) ? 'CIRCLE_SCA_ROUTE_UNAVAILABLE' : 'NO_SWAP_ROUTE',
+    error: /Circle wallet route/i.test(message)
+      ? message
+      : 'Route swap belum tersedia dari Circle Stablecoin Service untuk pasangan/jumlah ini. Coba jumlah lebih besar, atau ulangi beberapa menit lagi.',
     details: message,
   }
 }
