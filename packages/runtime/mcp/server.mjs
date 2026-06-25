@@ -123,7 +123,7 @@ const executionGuide = {
   recovery: [
     'If a tool returns preview_required, call the same tool without confirmed to get previewId.',
     'If MCP says route unavailable, call arcox_route_status and explain the unsupported slot.',
-    'If invoice status is pending, poll arcox_x402_invoice_status; do not ask for txHash.',
+    'If invoice status is payment_required/settlement_pending, poll arcox_x402_invoice_status; do not ask for txHash.',
     'If a call times out, check status/history before repeating value-moving execution.',
   ],
 }
@@ -145,13 +145,13 @@ const docsCatalog = [
     id: 'circle-nanopayments',
     title: 'Circle Gateway Nanopayments Readiness',
     tags: ['circle', 'gateway', 'nanopayments', 'x402', 'eip-3009'],
-    body: 'Circle Gateway Nanopayments use x402: paid resource request, HTTP 402 response, buyer offchain EIP-3009 authorization, retry with proof, and batched Gateway settlement. ARCOX exposes readiness metadata only; gas-free nanopayments settlement is not live yet.',
+    body: 'Circle Gateway/Unified Balance can route USDC for x402 payments. Current ARCOX x402 live testnet path is Arc USDC with Arc transaction memo; gas-free nanopayments settlement is roadmap/readiness only.',
   },
   {
     id: 'circle-agents',
     title: 'Circle for Agents Alignment',
     tags: ['circle', 'agents', 'x402', 'paid api', 'usdc'],
-    body: 'Circle for Agents positions USDC as payment-as-authentication for agents and paid APIs. ARCOX aligns by exposing quote-before-execute MCP tools, ARCOX Pay invoice/payment request tools, and x402/nanopayments readiness metadata. Current ARCOX execution remains public Arc Testnet USDC and does not claim live gas-free nanopayments.',
+    body: 'Circle for Agents positions USDC as payment-as-authentication for agents and paid APIs. ARCOX aligns by exposing quote-before-execute MCP tools, ARCOX Pay invoice/payment request tools, and x402 real testnet Arc USDC memo payments. Current ARCOX execution remains public Arc Testnet USDC.',
   },
   {
     id: 'mcp-safety',
@@ -460,7 +460,7 @@ const tools = [
   },
   {
     name: 'arcox_x402_invoice_status',
-    description: 'Check an internal ARCOX x402 invoice status. Paid invoices are set by Circle transactions.inbound webhook; no txHash submission is accepted.',
+    description: 'Check an internal ARCOX x402 invoice status. Paid invoices are set by Arc memo/ERC20 reconciliation or compatible Circle inbound webhook; no txHash submission is accepted.',
     inputSchema: {
       type: 'object',
       properties: {

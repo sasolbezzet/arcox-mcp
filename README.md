@@ -9,7 +9,6 @@ It exposes tools for:
 - Bridge quote and execution, including native ETH to Arc on verified Ethereum/Base Sepolia routers
 - Send quote and execution
 - ARCOX Pay invoice/payment request tools
-- ARCOX Pay NOWPayments sandbox tools for create/status/simulated treasury flow
 - ARCOX Intel tools that call ARCOX API x402 endpoints; MCP never stores `ARKHAM_API_KEY` and never calls Arkham directly
 - Bridge retry and transaction history
 - ARCOX Agentic Economy job actions
@@ -23,7 +22,7 @@ ARCOX MCP follows the Circle for Agents direction: USDC-native agent workflows, 
 - EOA agent wallet swap/send/bridge/payment using the user's local `AGENT_PRIVATE_KEY`.
 - Circle proxy wallet support only when a tool is explicitly called with `source="circle"`.
 - ARCOX Pay invoice/payment request tools for public USDC payment links on Arc Testnet.
-- x402/Circle Gateway Nanopayments readiness docs and metadata only.
+- x402 real testnet Arc USDC memo payments for ARCOX Intel.
 
 ARCOX does not claim live gas-free nanopayments or private payments. Those remain future integration work.
 
@@ -177,14 +176,15 @@ ARCOX Intel x402 payments use Arc transaction memos. The agent pays USDC through
 
 ## Circle Gateway Nanopayments Readiness
 
-ARCOX MCP understands Circle Gateway Nanopayments as a future x402 rail:
+ARCOX MCP understands Arc x402 payments as:
 
 1. API returns `402 Payment Required`.
-2. Buyer signs an offchain EIP-3009 authorization.
-3. Buyer retries with the proof.
-4. Gateway batch settlement is future work for ARCOX.
+2. Agent previews exact Arc Testnet USDC amount, recipient, invoice, and memo ID.
+3. User confirms `yes`.
+4. Agent pays through Arc Memo contract and polls invoice status.
+5. Paid invoice unlocks the Arkham result through ARCOX API.
 
-Do not tell users gas-free nanopayments are live. Current ARCOX Pay invoices remain public USDC payment links on Arc Testnet.
+Do not tell users gas-free nanopayments are live. Unified Balance/Gateway are payment rails; current MCP execution uses public Arc Testnet USDC.
 
 ## CLI Examples
 

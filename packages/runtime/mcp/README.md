@@ -49,7 +49,7 @@ Tools:
 - `arcox_execute_swap`: executes a confirmed Arc swap. EOA uses local `AGENT_PRIVATE_KEY` to sign approve and Circle AppKit adapter execute transactions. Without `confirmed: true`, it returns a quote only.
 - `arcox_create_payment_request`: creates an ARCOX Pay public USDC invoice/payment link on Arc Testnet.
 - `arcox_get_payment_request`, `arcox_quote_payment_request`, `arcox_pay_payment_request`, `arcox_check_payment_status`: read, quote, pay, and track ARCOX Pay invoices.
-- `arcox_x402_invoice_status`: checks internal ARCOX x402 invoices paid by Circle inbound webhook.
+- `arcox_x402_invoice_status`: checks internal ARCOX x402 invoices paid by Arc memo/ERC20 reconciliation or compatible Circle inbound webhook.
 - `arcox_intel_quote_wallet_report`, `arcox_intel_execute_wallet_report`, `arcox_intel_get_address`, `arcox_intel_get_tx`, `arcox_intel_get_contract`, `arcox_intel_get_entity`, `arcox_intel_get_token`, `arcox_intel_search`: request ARCOX Intel via ARCOX API/x402. MCP does not store `ARKHAM_API_KEY`.
   - `arcox_intel_get_address.service`: `basic`, `all`, `enriched`, `balances`, `counterparties`, `flows`, `history`, `volume`, `portfolio`.
   - `arcox_intel_get_tx.service`: `basic`, `transfers`.
@@ -63,5 +63,5 @@ Execution safety:
 - Execute tools only submit transactions when `confirmed: true`, a valid `previewId` is supplied, and the user confirmation text is exactly `yes` or `ya`.
 - EOA execution uses the local `AGENT_PRIVATE_KEY` in `arcox-agent/.env`.
 - Circle proxy wallet actions use the ARCOX backend auth session signed by the local agent key and must be explicitly requested with `source="circle"`.
-- ARCOX Intel x402 uses internal invoices and Arc transaction memos for payment reconciliation. Circle `transactions.inbound` remains a compatible signal, but MCP never asks users to submit a txHash manually.
+- ARCOX Intel x402 uses internal invoices and Arc transaction memos for payment reconciliation. MCP pays after preview/confirmation, polls status, and never asks users to submit a txHash manually.
 - Browser-wallet signing from the Web UI remains separate from terminal/MCP execution.

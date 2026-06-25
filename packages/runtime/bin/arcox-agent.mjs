@@ -1010,7 +1010,7 @@ async function arcoxApiGetJson(path, options = {}, timeoutMs = BACKEND_FETCH_TIM
     signal: AbortSignal.timeout(timeoutMs),
   })
   const data = await response.json().catch(() => ({}))
-  if (response.status === 402) return { paymentRequired: true, ...data, safeNextStep: 'Pay the exact invoice amount to the Circle treasury wallet. Do not submit a txHash. Poll /api/x402/invoices/:invoiceId/status until Circle webhook marks it paid, then retry with paymentId.' }
+  if (response.status === 402) return { paymentRequired: true, ...data, safeNextStep: 'Call arcox_x402_pay_invoice without confirmed to preview the exact Arc USDC memo payment. After user says yes, execute with confirmed=true and previewId; the agent polls status and returns the unlocked result.' }
   if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`)
   return data
 }
@@ -1021,7 +1021,7 @@ async function getJson(url) {
     signal: AbortSignal.timeout(BACKEND_FETCH_TIMEOUT_MS),
   })
   const data = await response.json().catch(() => ({}))
-  if (response.status === 402) return { status: 'payment_required', requiresPayment: true, ...data, safeNextStep: 'Pay the exact x402 invoice amount to the Circle treasury wallet. Circle transactions.inbound webhook unlocks access; do not submit a txHash.' }
+  if (response.status === 402) return { status: 'payment_required', requiresPayment: true, ...data, safeNextStep: 'Use arcox_x402_pay_invoice for preview and confirmed Arc USDC memo payment. Do not ask the user to submit a txHash.' }
   if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`)
   return data
 }
@@ -1037,7 +1037,7 @@ export function serviceCatalog() {
       { name: 'send', description: 'Quote and send supported Arc tokens from EOA or Circle wallet with confirmation.' },
       { name: 'bridge_retry', description: 'Retry mint for a completed burn transaction when attestation is ready.' },
       { name: 'arcox_pay', description: 'Create/check internal ARCOX Pay invoice/payment workflows.' },
-      { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode requires Circle x402 invoice payment and webhook confirmation.' },
+      { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode uses Arc Testnet USDC payment with Arc transaction memo reconciliation.' },
       { name: 'agentic_jobs', description: 'Plan/create/read/fund/submit/complete testnet Agentic Economy jobs.' },
     ],
     examplePrompts: [
@@ -3150,7 +3150,7 @@ export async function payGetPaymentStatus(input = {}) {
   return {
     status: 'disabled',
     paymentId,
-    reason: 'Legacy provider payment status is disabled. x402 now uses internal ARCOX invoices and Circle transactions.inbound webhook.',
+    reason: 'Legacy provider payment status is disabled. x402 now uses internal ARCOX invoices and Arc memo/on-chain reconciliation.',
     safeNextStep: 'Use arcox_x402_invoice_status with invoiceId or paymentId.',
   }
 }
@@ -3158,7 +3158,7 @@ export async function payGetPaymentStatus(input = {}) {
 export async function payListRecentPayments(input = {}) {
   return {
     status: 'disabled',
-    reason: 'Legacy provider payment history is disabled. x402 now uses internal ARCOX invoices and Circle transactions.inbound webhooks.',
+    reason: 'Legacy provider payment history is disabled. x402 now uses internal ARCOX invoices and Arc memo/on-chain reconciliation.',
     safeNextStep: 'Use arcox_x402_invoice_status for paid Intel invoices, or arcox_get_payment_request for ARCOX Pay invoices.',
     limit: input.limit || 10,
   }
@@ -3168,6 +3168,10 @@ export async function x402InvoiceStatus(input = {}) {
   const invoiceId = String(input.invoiceId || input.paymentId || '').trim()
   if (!invoiceId) throw new Error('invoiceId or paymentId is required.')
   return arcoxApiGetJson(`/api/x402/invoices/${encodeURIComponent(invoiceId)}/status`)
+}
+
+function isOpenX402Status(status) {
+  return ['created', 'payment_required', 'estimate_ready', 'awaiting_signature', 'spend_submitted', 'settlement_pending', 'recovery_required', 'pending'].includes(String(status || ''))
 }
 
 async function unlockX402Resource(invoice, explorer = '') {
@@ -3189,11 +3193,11 @@ export async function x402PayInvoice(input = {}) {
   const status = await x402InvoiceStatus({ invoiceId })
   const invoice = status.x402 || status.invoice
   if (!invoice) throw new Error('x402 invoice not found.')
-  if (invoice.status === 'paid') {
+  if (invoice.status === 'paid' || invoice.status === 'service_unlocked') {
     const unlockedResult = await unlockX402Resource(invoice, invoice.txHash ? `${EXPLORER_TX}${invoice.txHash}` : '').catch(error => ({ ok: false, error: error.message }))
     return { status: 'paid', invoice, alreadyPaid: true, unlockedResult }
   }
-  if (invoice.status !== 'pending') throw new Error(`x402 invoice status is ${invoice.status}.`)
+  if (!isOpenX402Status(invoice.status)) throw new Error(`x402 invoice status is ${invoice.status}.`)
   if (invoice.asset !== 'USDC') throw new Error('Only USDC x402 invoices are supported.')
   if (!invoice.recipient || !String(invoice.recipient).startsWith('0x')) throw new Error('x402 invoice recipient is invalid.')
   const amount = String(invoice.amount || invoice.uniqueAmount || '')
@@ -3211,7 +3215,7 @@ export async function x402PayInvoice(input = {}) {
       recipient: invoice.recipient,
       memoContract: invoice.memoContract || ARC_MEMO_CONTRACT,
       memoId: invoice.memoId,
-      instruction: `Confirm to pay ${amount} USDC to ${invoice.recipient} for ${invoice.invoiceId} using Arc transaction memo.`,
+      instruction: `Confirm to pay ${amount} USDC on Arc Testnet to ${invoice.recipient} for ${invoice.invoiceId} using Arc transaction memo.`,
     }
   }
   if (input.mcpPreviewVerified !== true) {
@@ -3253,7 +3257,7 @@ export async function x402PayInvoice(input = {}) {
     ? await unlockX402Resource({ ...latest, txHash: latest.txHash || txHash }, explorer).catch(error => ({ ok: false, error: error.message }))
     : null
   return {
-    status: latest.status === 'paid' ? 'paid' : 'pending_webhook',
+    status: latest.status === 'paid' ? 'paid' : 'settlement_pending',
     invoice: latest,
     txHash,
     explorer,
@@ -3262,7 +3266,7 @@ export async function x402PayInvoice(input = {}) {
     unlockedResult,
     safeNextStep: latest.status === 'paid'
       ? 'Paid. If unlockedResult is present, return it to the user immediately.'
-      : 'USDC transfer submitted. Wait for Circle transactions.inbound webhook, then check invoice status again.',
+      : 'USDC memo transfer submitted. Poll invoice status; ARCOX will unlock when the Arc memo/ERC20 transfer is reconciled.',
   }
 }
 
