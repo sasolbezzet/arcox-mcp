@@ -3191,6 +3191,7 @@ async function unlockX402Resource(invoice, explorer = '') {
 export async function x402PayInvoice(input = {}) {
   const invoiceId = String(input.invoiceId || input.paymentId || '').trim()
   if (!invoiceId) throw new Error('invoiceId or paymentId is required.')
+  const paymentMethod = String(input.paymentMethod || input.source || 'arc_memo').toLowerCase().replace(/[\s-]+/g, '_')
   const status = await x402InvoiceStatus({ invoiceId })
   const invoice = status.x402 || status.invoice
   if (!invoice) throw new Error('x402 invoice not found.')
@@ -3213,6 +3214,19 @@ export async function x402PayInvoice(input = {}) {
   const amountUnits = parseUnits(amount, 6)
   const max = Number(process.env.ARCOX_MAX_TX_USDC || '10')
   if (max > 0 && Number(amount) > max) throw new Error(`x402 payment exceeds ARCOX_MAX_TX_USDC=${max}.`)
+  if (paymentMethod === 'unified_balance' || paymentMethod === 'gateway' || paymentMethod === 'circle_gateway') {
+    return {
+      status: 'web_wallet_required',
+      requiresUserConfirmation: false,
+      invoice,
+      paymentMethod: 'unified_balance',
+      amount,
+      token: 'USDC',
+      recipient: invoice.recipient,
+      sourceOptions: ['auto', 'Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'],
+      safeNextStep: `Open https://arc-dex-bice.vercel.app/intel or /pay/status, choose Pay with Unified Balance, estimate first, then spend. MCP cannot sign Circle AppKit Unified Balance from terminal without a browser wallet session.`,
+    }
+  }
   if (input.confirmed !== true || !isSimpleConfirmationText(input.confirmationText)) {
     return {
       status: 'preview',
@@ -3224,6 +3238,7 @@ export async function x402PayInvoice(input = {}) {
       recipient: invoice.recipient,
       memoContract: invoice.memoContract || ARC_MEMO_CONTRACT,
       memoId: invoice.memoId,
+      paymentMethods: ['arc_memo', 'unified_balance'],
       instruction: `Confirm to pay ${amount} USDC on Arc Testnet to ${invoice.recipient} for ${invoice.invoiceId} using Arc transaction memo.`,
     }
   }

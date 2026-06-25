@@ -481,6 +481,7 @@ const tools = [
         previewId: { type: 'string' },
         confirmed: { type: 'boolean' },
         confirmationText: { type: 'string' },
+        paymentMethod: { type: 'string', enum: ['arc_memo', 'unified_balance'], default: 'arc_memo' },
       },
       additionalProperties: false,
     },
