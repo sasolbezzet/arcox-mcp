@@ -3183,6 +3183,7 @@ async function unlockX402Resource(invoice, explorer = '') {
     x402Payment: {
       ...invoice,
       explorer,
+      rpcVerified: !!invoice.txHash,
     },
   }
 }
@@ -3269,6 +3270,9 @@ export async function x402PayInvoice(input = {}) {
     invoice: latest,
     txHash,
     explorer,
+    rpcVerified: receipt?.status === 'success',
+    receiptStatus: receipt?.status || 'submitted',
+    blockNumber: receipt?.blockNumber ? String(receipt.blockNumber) : latest.blockNumber,
     memoId,
     memoContract: invoice.memoContract || ARC_MEMO_CONTRACT,
     unlockedResult,
