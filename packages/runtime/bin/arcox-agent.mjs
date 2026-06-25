@@ -3197,6 +3197,14 @@ export async function x402PayInvoice(input = {}) {
     const unlockedResult = await unlockX402Resource(invoice, invoice.txHash ? `${EXPLORER_TX}${invoice.txHash}` : '').catch(error => ({ ok: false, error: error.message }))
     return { status: 'paid', invoice, alreadyPaid: true, unlockedResult }
   }
+  if (invoice.status === 'expired') {
+    return {
+      status: 'expired',
+      invoice,
+      requiresNewInvoice: true,
+      safeNextStep: 'Run the Intel request again to get a fresh x402 invoice. Do not retry payment for this expired invoice.',
+    }
+  }
   if (!isOpenX402Status(invoice.status)) throw new Error(`x402 invoice status is ${invoice.status}.`)
   if (invoice.asset !== 'USDC') throw new Error('Only USDC x402 invoices are supported.')
   if (!invoice.recipient || !String(invoice.recipient).startsWith('0x')) throw new Error('x402 invoice recipient is invalid.')
@@ -3294,7 +3302,20 @@ export async function intelExecuteWalletReport(input = {}) {
 }
 
 async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
-  if (input.paymentId) return arcoxApiGetJson(path, { paymentId: input.paymentId }, timeoutMs)
+  if (input.paymentId) {
+    const paidAttempt = await arcoxApiGetJson(path, { paymentId: input.paymentId }, timeoutMs)
+    if (!paidAttempt.paymentRequired) return paidAttempt
+    const fresh = await arcoxApiGetJson(path, {}, timeoutMs)
+    const freshInvoice = fresh.x402 || fresh.invoice
+    if (!fresh.paymentRequired || !freshInvoice?.invoiceId) return fresh
+    return {
+      ...fresh,
+      previousPaymentId: input.paymentId,
+      requiresUserConfirmation: true,
+      instruction: `The previous x402 paymentId did not unlock this resource, usually because the invoice expired or was for another resource. Use this new invoice: first call arcox_x402_pay_invoice with invoiceId=${freshInvoice.invoiceId} to show the payment preview. After the user confirms, execute with confirmed=true, previewId, and confirmationText. Then retry this Intel tool with paymentId=${freshInvoice.paymentId}.`,
+      safeNextStep: `Use new invoiceId=${freshInvoice.invoiceId}; do not keep retrying the old paymentId=${input.paymentId}.`,
+    }
+  }
   const first = await arcoxApiGetJson(path, {}, timeoutMs)
   const invoice = first.x402 || first.invoice
   if (!first.paymentRequired || !invoice?.invoiceId) return first
