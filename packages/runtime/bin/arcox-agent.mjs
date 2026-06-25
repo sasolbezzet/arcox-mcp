@@ -3361,7 +3361,8 @@ export async function intelGetAddress(input = {}) {
     portfolio: '/portfolio',
   }
   if (!(service in suffixes)) throw new Error(`Unsupported address intel service: ${service}.`)
-  return paidIntelRequest(`/api/intel/address/${encodeURIComponent(address)}${suffixes[service]}`, input)
+  const query = ['flows', 'history', 'volume'].includes(service) ? intelTimeQuery(input) : ''
+  return paidIntelRequest(`/api/intel/address/${encodeURIComponent(address)}${suffixes[service]}${query}`, input)
 }
 
 export async function intelGetTx(input = {}) {
@@ -3369,7 +3370,8 @@ export async function intelGetTx(input = {}) {
   if (!hash) throw new Error('hash is required.')
   const service = normalizeIntelService(input.service)
   if (service !== 'basic' && service !== 'transfers') throw new Error(`Unsupported transaction intel service: ${service}.`)
-  return paidIntelRequest(`/api/intel/tx/${encodeURIComponent(hash)}${service === 'transfers' ? '/transfers' : ''}`, input)
+  const chainQuery = service === 'transfers' ? `?chain=${encodeURIComponent(String(input.chain || 'ethereum').trim())}` : ''
+  return paidIntelRequest(`/api/intel/tx/${encodeURIComponent(hash)}${service === 'transfers' ? '/transfers' : ''}${chainQuery}`, input)
 }
 
 export async function intelGetContract(input = {}) {
@@ -3390,7 +3392,8 @@ export async function intelGetEntity(input = {}) {
     flows: '/flows',
   }
   if (!(service in suffixes)) throw new Error(`Unsupported entity intel service: ${service}.`)
-  return paidIntelRequest(`/api/intel/entity/${encodeURIComponent(entity)}${suffixes[service]}`, input)
+  const query = service === 'flows' ? intelTimeQuery(input) : ''
+  return paidIntelRequest(`/api/intel/entity/${encodeURIComponent(entity)}${suffixes[service]}${query}`, input)
 }
 
 export async function intelGetToken(input = {}) {
@@ -3412,7 +3415,8 @@ export async function intelGetToken(input = {}) {
     'top-flow': '/top-flow',
   }
   if (!(service in suffixes)) throw new Error(`Unsupported token intel service: ${service}.`)
-  return paidIntelRequest(`/api/intel/token/${encodeURIComponent(token)}${suffixes[service]}`, input)
+  const query = service === 'top-flow' ? intelTimeQuery(input) : ''
+  return paidIntelRequest(`/api/intel/token/${encodeURIComponent(token)}${suffixes[service]}${query}`, input)
 }
 
 export async function intelSearch(input = {}) {
@@ -3424,6 +3428,11 @@ export async function intelSearch(input = {}) {
 function isSimpleConfirmationText(value) {
   const text = String(value || '').trim().toLowerCase()
   return text === 'yes' || text === 'ya'
+}
+
+function intelTimeQuery(input = {}) {
+  const timeLast = String(input.timeLast || '24h').trim()
+  return `?timeLast=${encodeURIComponent(timeLast)}`
 }
 
 function normalizeIntelService(value) {

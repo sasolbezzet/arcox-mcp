@@ -501,12 +501,13 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_address',
-    description: 'Get address intelligence through ARCOX API. service supports: basic, all, enriched, balances, counterparties, flows, history, volume, portfolio. If x402 is required, returns an invoice only. Use arcox_x402_pay_invoice for payment, then retry with paymentId.',
+    description: 'Get address intelligence through ARCOX API. service supports: basic, all, enriched, balances, counterparties, flows, history, volume, portfolio. Use timeLast for flows/history/volume, e.g. 24h, 7d, 30d. If x402 is required, returns an invoice only. Use arcox_x402_pay_invoice for payment, then retry with paymentId.',
     inputSchema: {
       type: 'object',
       properties: {
         address: { type: 'string' },
         service: { type: 'string', enum: ['basic', 'all', 'enriched', 'balances', 'counterparties', 'flows', 'history', 'volume', 'portfolio'], default: 'basic' },
+        timeLast: { type: 'string', enum: ['1h', '24h', '7d', '30d', '1M', '1y'], default: '24h' },
         paymentId: { type: 'string' },
       },
       required: ['address'],
@@ -515,12 +516,13 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_tx',
-    description: 'Get transaction intelligence through ARCOX API. service supports: basic, transfers.',
+    description: 'Get transaction intelligence through ARCOX API. service supports: basic, transfers. transfers requires/uses chain, default ethereum.',
     inputSchema: {
       type: 'object',
       properties: {
         hash: { type: 'string' },
         service: { type: 'string', enum: ['basic', 'transfers'], default: 'basic' },
+        chain: { type: 'string', default: 'ethereum' },
         paymentId: { type: 'string' },
       },
       required: ['hash'],
@@ -539,12 +541,13 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_entity',
-    description: 'Get entity intelligence through ARCOX API. service supports: basic, summary, balances, flows.',
+    description: 'Get entity intelligence through ARCOX API. service supports: basic, summary, balances, flows. Use timeLast for flows.',
     inputSchema: {
       type: 'object',
       properties: {
         entity: { type: 'string' },
         service: { type: 'string', enum: ['basic', 'summary', 'balances', 'flows'], default: 'basic' },
+        timeLast: { type: 'string', enum: ['1h', '24h', '7d', '30d', '1M', '1y'], default: '24h' },
         paymentId: { type: 'string' },
       },
       required: ['entity'],
@@ -553,7 +556,7 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_token',
-    description: 'Get token intelligence through ARCOX API. service supports: basic, market, holders, top-flow, trending, top, contract, contract-holders. Use chain+address for contract services.',
+    description: 'Get token intelligence through ARCOX API. service supports: basic, market, holders, top-flow, trending, top, contract, contract-holders. Use chain+address for contract services; use timeLast for top-flow.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -562,6 +565,7 @@ const tools = [
         chain: { type: 'string' },
         address: { type: 'string' },
         service: { type: 'string', enum: ['basic', 'market', 'holders', 'top-flow', 'trending', 'top', 'contract', 'contract-holders'], default: 'basic' },
+        timeLast: { type: 'string', enum: ['1h', '24h', '7d', '30d', '1M', '1y'], default: '24h' },
         paymentId: { type: 'string' },
       },
       additionalProperties: false,
