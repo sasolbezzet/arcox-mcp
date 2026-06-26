@@ -164,6 +164,28 @@ The agent must not skip the preview step.
 - `arcox_read_doc`
 - `arcox_agent_status`
 - `arcox_agent_job`
+- `get_ai_router_status`
+- `get_unified_balance`
+- `create_ai_api_key`
+- `list_ai_models`
+- `call_ai_model`
+- `get_usage_logs`
+
+ARCOX AI Router:
+
+- User funds AI Router from Unified Balance in the Web UI.
+- API keys use `arx_sk_...`; backend stores only hashes.
+- MCP can create a key with the local `AGENT_PRIVATE_KEY` owner session.
+- MCP can call models with `ARCOX_AI_ROUTER_API_KEY`.
+- Provider API keys are never stored in MCP; MCP only calls ARCOX API.
+
+OpenAI-compatible config:
+
+```text
+base_url = https://api.arcox.app/v1
+api_key = arx_sk_...
+model = arcox/auto
+```
 
 ARCOX Intel x402 service coverage:
 

@@ -8,13 +8,18 @@ import { actions, ARCOX_API_URL, ARCOX_WEB_URL, chainSupport, pages, retailRules
 import {
   agentStatus,
   checkPaymentStatus,
+  callAiModel,
   completeAgentJob,
+  createAiApiKey,
   createAgentJob,
   createPaymentRequest,
   executeConfirmedBridge,
   executeConfirmedSend,
   executeConfirmedSwap,
   fundAgentJob,
+  getAiRouterStatus,
+  getUnifiedBalance,
+  getUsageLogs,
   getPaymentRequest,
   intelExecuteWalletReport,
   intelGetAddress,
@@ -24,6 +29,7 @@ import {
   intelGetTx,
   intelQuoteWalletReport,
   intelSearch,
+  listAiModels,
   makeAgentResponse,
   serviceCatalog,
   payPaymentRequest,
@@ -258,6 +264,65 @@ const tools = [
     name: 'arcox_wallet_balances',
     description: 'Return all retail balances visible to the agent: EOA Arc tokens, Circle proxy wallet balances, and Solana Devnet USDC.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'get_ai_router_status',
+    description: 'Get ARCOX AI Router status: Unified Balance-funded credit, Auto Pay status, API key status, usage log, and models.',
+    inputSchema: {
+      type: 'object',
+      properties: { ownerAddress: { type: 'string' } },
+      required: ['ownerAddress'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_unified_balance',
+    description: 'Get AI Router credited Unified Balance status for an owner. Browser wallet live Unified Balance is checked in Web UI.',
+    inputSchema: {
+      type: 'object',
+      properties: { ownerAddress: { type: 'string' } },
+      required: ['ownerAddress'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_ai_api_key',
+    description: 'Create an ARCOX AI Router API key with ai:chat and ai:models scopes. Returns the key once; backend stores only its hash.',
+    inputSchema: {
+      type: 'object',
+      properties: { ownerAddress: { type: 'string' }, label: { type: 'string' } },
+      required: ['ownerAddress'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_ai_models',
+    description: 'List OpenAI-compatible ARCOX AI Router models.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'call_ai_model',
+    description: 'Call ARCOX AI Router /v1/chat/completions with an ARCOX arx_sk API key. Does not expose provider API keys.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string' },
+        model: { type: 'string', default: 'arcox/auto' },
+        apiKey: { type: 'string', description: 'Optional arx_sk key. Prefer ARCOX_AI_ROUTER_API_KEY env.' },
+      },
+      required: ['prompt'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_usage_logs',
+    description: 'Get ARCOX AI Router usage logs for an owner.',
+    inputSchema: {
+      type: 'object',
+      properties: { ownerAddress: { type: 'string' }, limit: { type: 'number', default: 10 } },
+      required: ['ownerAddress'],
+      additionalProperties: false,
+    },
   },
   {
     name: 'arcox_quote_bridge',
@@ -1078,6 +1143,12 @@ async function rpcResponse(message) {
     if (name === 'arcox_route_status') return result(id, routeStatus(args))
     if (name === 'arcox_agent_status') return result(id, await agentStatus())
     if (name === 'arcox_wallet_balances') return result(id, await walletBalances())
+    if (name === 'get_ai_router_status') return result(id, await getAiRouterStatus(args))
+    if (name === 'get_unified_balance') return result(id, await getUnifiedBalance(args))
+    if (name === 'create_ai_api_key') return result(id, await createAiApiKey(args))
+    if (name === 'list_ai_models') return result(id, await listAiModels(args))
+    if (name === 'call_ai_model') return result(id, await callAiModel(args))
+    if (name === 'get_usage_logs') return result(id, await getUsageLogs(args))
     if (name === 'arcox_quote_bridge') return result(id, attachPreview(name, args, await quoteBridge(args)))
     if (name === 'arcox_execute_bridge') {
       const fromChain = normalizeMcpChain(args.fromChain)

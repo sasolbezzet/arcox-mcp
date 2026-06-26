@@ -1038,6 +1038,7 @@ export function serviceCatalog() {
       { name: 'bridge_retry', description: 'Retry mint for a completed burn transaction when attestation is ready.' },
       { name: 'arcox_pay', description: 'Create/check internal ARCOX Pay invoice/payment workflows.' },
       { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode uses Arc Testnet USDC payment with Arc transaction memo reconciliation.' },
+      { name: 'ai_router', description: 'OpenAI-compatible ARCOX AI Router using ARCOX API keys and Unified Balance-funded Auto Pay credit.' },
       { name: 'agentic_jobs', description: 'Plan/create/read/fund/submit/complete testnet Agentic Economy jobs.' },
     ],
     examplePrompts: [
@@ -1049,8 +1050,70 @@ export function serviceCatalog() {
       'create payment request 10 usdc to 0x...',
       'quote arkham wallet report for 0x...',
       'check x402 invoice arcox_x402_...',
+      'show ai router status for 0x...',
+      'list ai router models',
+      'call ai router model with prompt ...',
     ],
   }
+}
+
+export async function getAiRouterStatus(input = {}) {
+  const ownerAddress = String(input.ownerAddress || input.address || '').trim()
+  if (!ownerAddress) throw new Error('ownerAddress is required.')
+  return arcoxApiGetJson(`/api/ai-router/status?ownerAddress=${encodeURIComponent(ownerAddress)}`)
+}
+
+export async function getUnifiedBalance(input = {}) {
+  const ownerAddress = String(input.ownerAddress || input.address || '').trim()
+  if (!ownerAddress) throw new Error('ownerAddress is required.')
+  const status = await getAiRouterStatus({ ownerAddress })
+  return {
+    ownerAddress,
+    unifiedBalance: status.unifiedBalance,
+    note: 'Browser wallet Unified Balance live balance is checked in Web UI. MCP can see AI Router credited balance after a verified Unified Balance spend.',
+  }
+}
+
+export async function createAiApiKey(input = {}) {
+  const ownerAddress = String(input.ownerAddress || input.address || '').trim()
+  if (!ownerAddress) throw new Error('ownerAddress is required.')
+  const account = privateKeyToAccount(privateKey())
+  if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match local AGENT_PRIVATE_KEY signer.')
+  const token = await backendSession(account)
+  return postJson('/api/ai-router/api-keys', { ownerAddress, label: input.label || 'ARCOX MCP AI Router' }, token)
+}
+
+export async function listAiModels() {
+  return arcoxApiGetJson('/api/ai-router/models')
+}
+
+export async function getUsageLogs(input = {}) {
+  const ownerAddress = String(input.ownerAddress || input.address || '').trim()
+  if (!ownerAddress) throw new Error('ownerAddress is required.')
+  const limit = Number(input.limit || 10)
+  return arcoxApiGetJson(`/api/ai-router/usage?ownerAddress=${encodeURIComponent(ownerAddress)}&limit=${encodeURIComponent(String(limit))}`)
+}
+
+export async function callAiModel(input = {}) {
+  const apiKey = String(input.apiKey || process.env.ARCOX_AI_ROUTER_API_KEY || '').trim()
+  if (!apiKey.startsWith('arx_sk_')) throw new Error('ARCOX AI Router API key is required. Set ARCOX_AI_ROUTER_API_KEY or pass apiKey.')
+  const prompt = String(input.prompt || '').trim()
+  const messages = Array.isArray(input.messages) ? input.messages : [{ role: 'user', content: prompt }]
+  if (!messages.length || !messages[0]?.content) throw new Error('prompt or messages is required.')
+  const response = await fetch(`${ARCOX_API_BASE_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: input.model || 'arcox/auto',
+      messages,
+      temperature: input.temperature ?? 0.7,
+    }),
+    signal: AbortSignal.timeout(Number(input.timeoutMs || 90_000)),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (response.status === 402) return { status: 'payment_required', ...data, safeNextStep: 'Deposit USDC to Unified Balance in ARCOX Web UI, fund AI Router credit, then retry.' }
+  if (!response.ok || data.error) throw new Error(data?.error?.message || data.error || `HTTP ${response.status}`)
+  return data
 }
 
 export async function backendSession(account) {
