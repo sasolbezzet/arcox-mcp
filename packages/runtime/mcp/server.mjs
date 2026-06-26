@@ -267,7 +267,7 @@ const tools = [
   },
   {
     name: 'get_ai_router_status',
-    description: 'Get ARCOX AI Router status: Unified Balance-funded credit, Auto Pay status, API key status, usage log, and models.',
+    description: 'Get ARCOX AI Router status: Unified Balance availability, Auto Pay status, delegate status, API key status, usage log, and models.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' } },
@@ -277,7 +277,7 @@ const tools = [
   },
   {
     name: 'get_unified_balance',
-    description: 'Get AI Router credited Unified Balance status for an owner. Browser wallet live Unified Balance is checked in Web UI.',
+    description: 'Get AI Router Unified Balance/delegate status for an owner. Browser wallet live Unified Balance is checked in Web UI.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' } },

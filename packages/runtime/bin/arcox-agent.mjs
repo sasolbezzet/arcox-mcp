@@ -1038,7 +1038,7 @@ export function serviceCatalog() {
       { name: 'bridge_retry', description: 'Retry mint for a completed burn transaction when attestation is ready.' },
       { name: 'arcox_pay', description: 'Create/check internal ARCOX Pay invoice/payment workflows.' },
       { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode uses Arc Testnet USDC payment with Arc transaction memo reconciliation.' },
-      { name: 'ai_router', description: 'OpenAI-compatible ARCOX AI Router using ARCOX API keys and Unified Balance-funded Auto Pay credit.' },
+      { name: 'ai_router', description: 'OpenAI-compatible ARCOX AI Router using ARCOX API keys and per-request Unified Balance Auto Pay.' },
       { name: 'agentic_jobs', description: 'Plan/create/read/fund/submit/complete testnet Agentic Economy jobs.' },
     ],
     examplePrompts: [
@@ -1070,7 +1070,8 @@ export async function getUnifiedBalance(input = {}) {
   return {
     ownerAddress,
     unifiedBalance: status.unifiedBalance,
-    note: 'Browser wallet Unified Balance live balance is checked in Web UI. MCP can see AI Router credited balance after a verified Unified Balance spend.',
+    delegate: status.delegate,
+    note: 'Browser wallet Unified Balance live balance is checked in Web UI. AI Router does not use prepaid credit; each model request is paid through delegated Unified Balance spend.',
   }
 }
 
@@ -1111,7 +1112,7 @@ export async function callAiModel(input = {}) {
     signal: AbortSignal.timeout(Number(input.timeoutMs || 90_000)),
   })
   const data = await response.json().catch(() => ({}))
-  if (response.status === 402) return { status: 'payment_required', ...data, safeNextStep: 'Deposit USDC to Unified Balance in ARCOX Web UI, fund AI Router credit, then retry.' }
+  if (response.status === 402) return { status: 'payment_required', ...data, safeNextStep: 'Deposit USDC to Unified Balance in ARCOX Web UI, enable Auto Pay, then retry.' }
   if (!response.ok || data.error) throw new Error(data?.error?.message || data.error || `HTTP ${response.status}`)
   return data
 }

@@ -173,10 +173,10 @@ The agent must not skip the preview step.
 
 ARCOX AI Router:
 
-- User funds AI Router from Unified Balance in the Web UI.
+- User deposits USDC to Unified Balance and enables Auto Pay in the Web UI.
 - API keys use `arx_sk_...`; backend stores only hashes.
 - MCP can create a key with the local `AGENT_PRIVATE_KEY` owner session.
-- MCP can call models with `ARCOX_AI_ROUTER_API_KEY`.
+- MCP can call models with `ARCOX_AI_ROUTER_API_KEY`; each request is paid from user Unified Balance through backend delegated spend.
 - Provider API keys are never stored in MCP; MCP only calls ARCOX API.
 
 OpenAI-compatible config:
