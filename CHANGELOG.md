@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.22
+
+- Persist quote previews across MCP process restarts so Hermes can execute the confirmed preview.
+- Validate swap calldata numeric fields before approval and replace ambiguous BigInt errors with safe diagnostics.
+
 ## 0.1.21
 
 - Add live Unified Balance reads and confirmed AppKit deposit tools for the local agent signer.

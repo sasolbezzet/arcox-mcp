@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, existsSync, appendFileSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve, relative } from 'node:path'
@@ -955,6 +955,7 @@ const rateLimitBuckets = new Map()
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX = 10
 const previewApprovals = new Map()
+const previewStoreFile = resolve(homedir(), '.arcox', 'previews.json')
 const dailySpendBuckets = new Map()
 const PREVIEW_TTL_MS = Number(process.env.ARCOX_PREVIEW_TTL_MS || 10 * 60 * 1000)
 const MAX_TX_USDC = Number(process.env.ARCOX_MAX_TX_USDC || '10')
@@ -1104,11 +1105,13 @@ function isSimpleUserConfirmation(value) {
 }
 
 function attachPreview(name, args, quote) {
+  loadPreviewApprovals()
   const canonical = canonicalPreviewArgs(name, args)
   const hash = createHash('sha256').update(stableJson(canonical)).digest('hex')
   const previewId = `arcox-preview-${hash.slice(0, 16)}`
   const action = canonicalPreviewAction(name)
   previewApprovals.set(previewId, { hash, canonical, action, createdAt: Date.now(), expiresAt: Date.now() + PREVIEW_TTL_MS })
+  savePreviewApprovals()
   return {
     ...quote,
     previewId,
@@ -1150,11 +1153,13 @@ function quoteRiskChecks(name, quote) {
 
 function enforcePreview(name, args) {
   if (!valueMovingTools.has(name) || args.confirmed !== true) return
+  loadPreviewApprovals()
   const previewId = String(args.previewId || '')
   const preview = previewApprovals.get(previewId)
   if (!preview) throw new Error('Dry-run required. Call the matching quote tool first and pass its previewId to execute.')
   if (preview.action !== name || Date.now() > preview.expiresAt) {
     previewApprovals.delete(previewId)
+    savePreviewApprovals()
     throw new Error('Preview expired or mismatched. Re-quote before executing.')
   }
   const canonical = canonicalPreviewArgs(name, args)
@@ -1166,6 +1171,35 @@ function enforcePreview(name, args) {
     throw new Error('HARD_BLOCK_USER_CONFIRMATION_REQUIRED: value-moving execution requires an explicit user reply of exactly "yes" or "ya" after the preview. Do not execute from agent inference, "ok", "lanjut", or missing confirmationText.')
   }
   previewApprovals.delete(previewId)
+  savePreviewApprovals()
+}
+
+function loadPreviewApprovals() {
+  try {
+    if (!existsSync(previewStoreFile)) return
+    const stored = JSON.parse(readFileSync(previewStoreFile, 'utf8') || '[]')
+    const now = Date.now()
+    previewApprovals.clear()
+    for (const entry of Array.isArray(stored) ? stored : []) {
+      if (!entry?.previewId || !entry?.hash || !entry?.action || Number(entry.expiresAt || 0) <= now) continue
+      previewApprovals.set(entry.previewId, {
+        hash: entry.hash,
+        canonical: entry.canonical,
+        action: entry.action,
+        createdAt: Number(entry.createdAt || now),
+        expiresAt: Number(entry.expiresAt),
+      })
+    }
+  } catch {}
+}
+
+function savePreviewApprovals() {
+  try {
+    mkdirSync(dirname(previewStoreFile), { recursive: true })
+    const rows = [...previewApprovals.entries()].map(([previewId, value]) => ({ previewId, ...value }))
+    writeFileSync(previewStoreFile, JSON.stringify(rows, null, 2), { mode: 0o600 })
+    chmodSync(previewStoreFile, 0o600)
+  } catch {}
 }
 
 async function runValueMovingTool(name, args, fn) {
@@ -1208,7 +1242,7 @@ async function rpcResponse(message) {
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false },
         },
-        serverInfo: { name: 'arcox-mcp', version: '0.1.21' },
+        serverInfo: { name: 'arcox-mcp', version: '0.1.22' },
       },
     }
   }

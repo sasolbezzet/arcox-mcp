@@ -2617,23 +2617,33 @@ async function executeEoaPreparedSwap({ owner, tokenIn, tokenOut, apiTokenIn, ap
 }
 
 function normalizeAdapterExecutionParams(params = {}) {
+  if (!Array.isArray(params.instructions) || !Array.isArray(params.tokens)) throw new Error('Swap execution parameters are incomplete; no transaction was submitted.')
   return {
     instructions: (params.instructions || []).map(item => ({
       target: getAddress(item.target),
       data: item.data,
-      value: BigInt(item.value),
+      value: requiredBigInt(item.value ?? 0, 'instruction.value'),
       tokenIn: getAddress(item.tokenIn),
-      amountToApprove: BigInt(item.amountToApprove),
+      amountToApprove: requiredBigInt(item.amountToApprove ?? 0, 'instruction.amountToApprove'),
       tokenOut: getAddress(item.tokenOut),
-      minTokenOut: BigInt(item.minTokenOut),
+      minTokenOut: requiredBigInt(item.minTokenOut ?? 0, 'instruction.minTokenOut'),
     })),
     tokens: (params.tokens || []).map(item => ({
       token: getAddress(item.token),
       beneficiary: getAddress(item.beneficiary),
     })),
-    execId: BigInt(params.execId),
-    deadline: BigInt(params.deadline),
+    execId: requiredBigInt(params.execId, 'execution.execId'),
+    deadline: requiredBigInt(params.deadline, 'execution.deadline'),
     metadata: params.metadata || '0x',
+  }
+}
+
+function requiredBigInt(value, field) {
+  if (value === undefined || value === null || value === '') throw new Error(`Swap ${field} is missing; no transaction was submitted.`)
+  try {
+    return BigInt(value)
+  } catch {
+    throw new Error(`Swap ${field} is invalid; no transaction was submitted.`)
   }
 }
 
