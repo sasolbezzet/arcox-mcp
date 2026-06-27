@@ -107,8 +107,8 @@ const executionGuide = {
     },
     {
       intent: 'x402 intel',
-      steps: ['arcox_intel_get_address/tx/contract/entity/token/search to get invoice', 'arcox_x402_pay_invoice without confirmed to get previewId', 'show exact amount/recipient/resource', 'user yes', 'arcox_x402_pay_invoice with confirmed=true, previewId, confirmationText', 'return unlockedResult immediately'],
-      never: ['Do not execute x402 payment without previewId.', 'Do not ask user to submit txHash manually.'],
+      steps: ['arcox_intel_get_address/tx/contract/entity/token/search to get invoice', 'arcox_x402_pay_invoice without confirmed to get previewId', 'show exact amount/recipient/resource', 'user yes', 'arcox_x402_pay_invoice with confirmed=true, previewId, confirmationText', 'return unlockedResult immediately', 'present mcpDisplay with payment receipt, overview, every labeled section and data quality'],
+      never: ['Do not execute x402 payment without previewId.', 'Do not ask user to submit txHash manually.', 'Do not reduce a paid result to unlabeled numbers or omit available fields.'],
     },
     {
       intent: 'payment request',
@@ -553,7 +553,7 @@ const tools = [
   },
   {
     name: 'arcox_intel_execute_wallet_report',
-    description: 'Execute an ARCOX Intel full wallet report through the ARCOX API backend after x402 payment. If no paymentId is supplied, returns a payment preview/invoice only. Use arcox_x402_pay_invoice for payment.',
+    description: 'Execute an ARCOX Intel full wallet report through the ARCOX API backend after x402 payment. If no paymentId is supplied, returns a payment preview/invoice only. Use arcox_x402_pay_invoice for payment. After unlock, present mcpDisplay completely with labeled fields, records, payment receipt, and data quality.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -566,7 +566,7 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_address',
-    description: 'Get address intelligence through ARCOX API. service supports: basic, all, enriched, balances, counterparties, flows, history, volume, portfolio. Use timeLast for flows/history/volume, e.g. 24h, 7d, 30d. If x402 is required, returns an invoice only. Use arcox_x402_pay_invoice for payment, then retry with paymentId.',
+    description: 'Get address intelligence through ARCOX API. service supports: basic, all, enriched, balances, counterparties, flows, history, volume, portfolio. Use timeLast for flows/history/volume, e.g. 24h, 7d, 30d. If x402 is required, returns an invoice only. Use arcox_x402_pay_invoice for payment, then retry with paymentId. Present every labeled mcpDisplay section after unlock.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -581,7 +581,7 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_tx',
-    description: 'Get transaction intelligence through ARCOX API. service supports: basic, transfers. transfers requires/uses chain, default ethereum.',
+    description: 'Get transaction intelligence through ARCOX API. service supports: basic, transfers. transfers requires/uses chain, default ethereum. After unlock, present the payment receipt and every labeled mcpDisplay field and record.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -596,7 +596,7 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_contract',
-    description: 'Get contract intelligence through ARCOX API.',
+    description: 'Get contract intelligence through ARCOX API. After unlock, present the payment receipt and every labeled mcpDisplay field and record.',
     inputSchema: {
       type: 'object',
       properties: { chain: { type: 'string' }, address: { type: 'string' }, paymentId: { type: 'string' } },
@@ -606,7 +606,7 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_entity',
-    description: 'Get entity intelligence through ARCOX API. service supports: basic, summary, balances, flows. Use timeLast for flows.',
+    description: 'Get entity intelligence through ARCOX API. service supports: basic, summary, balances, flows. Use timeLast for flows. After unlock, present every labeled mcpDisplay section and data-quality note.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -621,7 +621,7 @@ const tools = [
   },
   {
     name: 'arcox_intel_get_token',
-    description: 'Get token intelligence through ARCOX API. service supports: basic, market, holders, top-flow, trending, top, contract, contract-holders. Use chain+address for contract services; use timeLast for top-flow.',
+    description: 'Get token intelligence through ARCOX API. service supports: basic, market, holders, top-flow, trending, top, contract, contract-holders. Use chain+address for contract services; use timeLast for top-flow. After unlock, present every labeled mcpDisplay section and record, never unlabeled numbers.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -638,7 +638,7 @@ const tools = [
   },
   {
     name: 'arcox_intel_search',
-    description: 'Search Arkham intelligence through ARCOX API.',
+    description: 'Search Arkham intelligence through ARCOX API. After unlock, present every labeled mcpDisplay result and its context.',
     inputSchema: {
       type: 'object',
       properties: { query: { type: 'string' }, paymentId: { type: 'string' } },

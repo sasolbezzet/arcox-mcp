@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.20
+
+- Present paid ARCOX Intel results as labeled MCP sections instead of raw or unlabeled values.
+- Include x402 payment receipt, request context, data coverage, provider fields, records, and interpretation notes.
+- Remove duplicate raw Arkham payloads from MCP output while retaining structured result detail.
+
 ## 0.1.5
 
 - Add native ETH bridge quote/execution support from Ethereum Sepolia and Base Sepolia to Arc through `ArcoxNativeSwapBridgeRouter`.

@@ -3387,10 +3387,10 @@ export async function intelExecuteWalletReport(input = {}) {
 async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
   if (input.paymentId) {
     const paidAttempt = await arcoxApiGetJson(path, { paymentId: input.paymentId }, timeoutMs)
-    if (!paidAttempt.paymentRequired) return paidAttempt
+    if (!paidAttempt.paymentRequired) return withIntelDisplay(paidAttempt)
     const fresh = await arcoxApiGetJson(path, {}, timeoutMs)
     const freshInvoice = fresh.x402 || fresh.invoice
-    if (!fresh.paymentRequired || !freshInvoice?.invoiceId) return fresh
+    if (!fresh.paymentRequired || !freshInvoice?.invoiceId) return withIntelDisplay(fresh)
     return {
       ...fresh,
       previousPaymentId: input.paymentId,
@@ -3401,12 +3401,82 @@ async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
   }
   const first = await arcoxApiGetJson(path, {}, timeoutMs)
   const invoice = first.x402 || first.invoice
-  if (!first.paymentRequired || !invoice?.invoiceId) return first
+  if (!first.paymentRequired || !invoice?.invoiceId) return withIntelDisplay(first)
   return {
     ...first,
     requiresUserConfirmation: true,
     instruction: `This Intel request requires x402 payment. First call arcox_x402_pay_invoice with invoiceId=${invoice.invoiceId} to show the payment preview. After the user confirms that payment preview, execute arcox_x402_pay_invoice with confirmed=true, previewId, and confirmationText. Then retry this Intel tool with paymentId=${invoice.paymentId}.`,
   }
+}
+
+function withIntelDisplay(result) {
+  const presentation = result?.intelPresentation
+  if (!presentation || typeof presentation !== 'object') return result
+  const payment = result.x402Payment || {}
+  const overview = Array.isArray(presentation.overview) ? presentation.overview : []
+  const sections = Array.isArray(presentation.sections) ? presentation.sections : []
+  const quality = presentation.dataQuality || {}
+  const displaySections = sections.map(section => ({
+    title: String(section.title || 'Result section'),
+    description: String(section.description || ''),
+    fields: displayFields(section.fields),
+    records: (Array.isArray(section.records) ? section.records : []).map(record => ({
+      index: record.index,
+      title: String(record.title || `Record ${record.index || ''}`).trim(),
+      fields: displayFields(record.fields),
+    })),
+  }))
+  const mcpDisplay = {
+    title: String(presentation.title || 'ARCOX Intel Result'),
+    summary: String(presentation.subtitle || ''),
+    service: String(presentation.service || 'arcox_intel'),
+    provider: String(presentation.provider || 'Arkham Intel API'),
+    generatedAt: presentation.generatedAt || null,
+    requestContext: {
+      resource: presentation.resource || null,
+      providerEndpoint: presentation.providerPath || null,
+      query: presentation.query || {},
+    },
+    paymentReceipt: result.x402Payment ? {
+      status: payment.status || 'paid',
+      invoiceId: payment.invoiceId || null,
+      paymentId: payment.paymentId || null,
+      exactAmount: payment.amount ? `${payment.amount} ${payment.asset || 'USDC'}` : null,
+      network: payment.network || null,
+      recipient: payment.recipient || null,
+      transactionHash: payment.txHash || null,
+      paidAt: payment.paidAt || null,
+      reconciledBy: payment.reconciledBy || null,
+    } : null,
+    coverage: {
+      status: quality.status || 'complete',
+      labeledFields: Number(quality.fieldCount || 0),
+      records: Number(quality.recordCount || 0),
+      sections: Number(quality.sectionCount || displaySections.length),
+      errors: Array.isArray(quality.errors) ? quality.errors : [],
+    },
+    overview: displayFields(overview),
+    sections: displaySections,
+    guidance: Array.isArray(presentation.guidance) ? presentation.guidance.map(String) : [],
+  }
+  const output = { ...result }
+  delete output.data
+  delete output.report
+  delete output.intelPresentation
+  return {
+    ...output,
+    mcpDisplay,
+    resultInstructions: 'Present mcpDisplay in this order: result context, payment receipt with full tx hash, overview, every section, every record with labeled fields, data quality, then guidance. Never return unlabeled numbers and never omit units, chain, timestamp, address, or transaction context when provided.',
+  }
+}
+
+function displayFields(fields) {
+  return (Array.isArray(fields) ? fields : []).map(field => ({
+    label: String(field?.label || 'Value'),
+    value: String(field?.value ?? '-'),
+    kind: String(field?.kind || 'text'),
+    sourcePath: String(field?.path || ''),
+  }))
 }
 
 export async function intelGetAddress(input = {}) {
