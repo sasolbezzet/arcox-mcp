@@ -1,7 +1,7 @@
 {
   "name": "arcox-mcp",
   "private": false,
-  "version": "0.1.20",
+  "version": "0.1.21",
   "type": "module",
   "description": "ARCOX DEX MCP server and terminal agent for retail swap, bridge, send, ARCOX Pay invoices, balances, history, retry bridge, and agentic jobs.",
   "license": "MIT",
@@ -59,6 +59,8 @@
     "verify:router": "node packages/runtime/scripts/verify-router.mjs"
   },
   "dependencies": {
+    "@circle-fin/adapter-viem-v2": "^1.12.1",
+    "@circle-fin/app-kit": "^1.8.1",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "bs58": "^6.0.0",

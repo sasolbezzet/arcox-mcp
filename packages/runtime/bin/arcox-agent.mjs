@@ -22,6 +22,8 @@ import {
   encodeFunctionData,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { AppKit } from '@circle-fin/app-kit'
+import { createViemAdapterFromPrivateKey } from '@circle-fin/adapter-viem-v2'
 import bs58 from 'bs58'
 import {
   Connection,
@@ -79,6 +81,7 @@ const RPC_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || '8000')
 const SOLANA_CONFIRM_TIMEOUT_MS = Number(process.env.SOLANA_CONFIRM_TIMEOUT_MS || '45000')
 const PLATFORM_FEE_BPS = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
 const ARC_APPKIT_ADAPTER = '0xBBD70b01a1CAbc96d5b7b129Ae1AAabdf50dd40b'
+const UNIFIED_BALANCE_CHAINS = new Set(['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'])
 const SOLANA_FEE_TREASURY = process.env.SOLANA_FEE_TREASURY || '4kAf2Qxf9KnbnKo7ukPMMu8q1UButJYNik4yQtvWhExw'
 const AUTO_MINT_DIR = join(AGENT_HOME, '.arcox-auto-mint')
 const TX_HISTORY_FILE = join(AGENT_HOME, '.arcox-agent-history.json')
@@ -90,6 +93,8 @@ const ARC_TOKENS = {
   USYC: { address: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C', decimals: 6 },
   CIRBTC: { address: '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF', decimals: 8 },
 }
+let agentAppKit
+let agentUnifiedBalanceAdapter
 
 const adapterExecuteAbi = [
   {
@@ -1038,7 +1043,7 @@ export function serviceCatalog() {
       { name: 'bridge_retry', description: 'Retry mint for a completed burn transaction when attestation is ready.' },
       { name: 'arcox_pay', description: 'Create/check internal ARCOX Pay invoice/payment workflows.' },
       { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode uses Arc Testnet USDC payment with Arc transaction memo reconciliation.' },
-      { name: 'ai_router', description: 'OpenAI-compatible ARCOX AI Router using ARCOX API keys and per-request Unified Balance Auto Pay.' },
+      { name: 'ai_router', description: 'Check/deposit Unified Balance, enable or disable Auto Pay, create/delete API keys, list models, call models, and inspect usage.' },
       { name: 'agentic_jobs', description: 'Plan/create/read/fund/submit/complete testnet Agentic Economy jobs.' },
     ],
     examplePrompts: [
@@ -1051,6 +1056,9 @@ export function serviceCatalog() {
       'quote arkham wallet report for 0x...',
       'check x402 invoice arcox_x402_...',
       'show ai router status for 0x...',
+      'deposit 1 usdc from arc to unified balance',
+      'turn ai router auto pay on',
+      'create ai router api key',
       'list ai router models',
       'call ai router model with prompt ...',
     ],
@@ -1058,30 +1066,186 @@ export function serviceCatalog() {
 }
 
 export async function getAiRouterStatus(input = {}) {
-  const ownerAddress = String(input.ownerAddress || input.address || '').trim()
-  if (!ownerAddress) throw new Error('ownerAddress is required.')
+  const ownerAddress = agentOwnerAddress(input)
   return arcoxApiGetJson(`/api/ai-router/status?ownerAddress=${encodeURIComponent(ownerAddress)}`)
 }
 
 export async function getUnifiedBalance(input = {}) {
-  const ownerAddress = String(input.ownerAddress || input.address || '').trim()
-  if (!ownerAddress) throw new Error('ownerAddress is required.')
-  const status = await getAiRouterStatus({ ownerAddress })
+  const ownerAddress = agentOwnerAddress(input)
+  const [status, balance] = await Promise.all([
+    getAiRouterStatus({ ownerAddress }),
+    postJson('/api/unified-balance/balances', { address: ownerAddress }, '', 30_000),
+  ])
   return {
     ownerAddress,
-    unifiedBalance: status.unifiedBalance,
+    token: 'USDC',
+    totalConfirmedBalance: balance.totalConfirmedBalance || '0.000000',
+    totalPendingBalance: balance.totalPendingBalance || '0.000000',
+    breakdown: balance.breakdown || [],
+    autoPay: status.autoPay,
     delegate: status.delegate,
-    note: 'Browser wallet Unified Balance live balance is checked in Web UI. AI Router does not use prepaid credit; each model request is paid through delegated Unified Balance spend.',
+    source: balance.source || 'circle-gateway-server',
+    note: 'Live Circle Gateway Unified Balance. AI Router spends only after a model request succeeds.',
+  }
+}
+
+export async function quoteUnifiedBalanceDeposit(input = {}) {
+  const account = privateKeyToAccount(privateKey())
+  const chain = normalizeUnifiedBalanceChain(input.chain || input.sourceChain || 'Arc_Testnet')
+  const amount = String(input.amount || '').trim()
+  if (!/^\d+(\.\d+)?$/.test(amount) || Number(amount) <= 0) throw new Error('Deposit amount must be greater than zero.')
+  return {
+    status: 'quote',
+    action: 'deposit_unified_balance',
+    ownerAddress: account.address,
+    sourceChain: chain,
+    token: 'USDC',
+    amount,
+    signer: 'local AGENT_PRIVATE_KEY',
+    route: `${chain} USDC -> Circle Gateway Unified Balance`,
+    requiresUserConfirmation: true,
+    safeNextStep: 'Show this deposit preview, then execute only after the user replies yes or ya.',
+  }
+}
+
+export async function depositUnifiedBalance(input = {}) {
+  if (input.confirmed !== true || input.mcpPreviewVerified !== true) return quoteUnifiedBalanceDeposit(input)
+  const quote = await quoteUnifiedBalanceDeposit(input)
+  const result = await unifiedBalanceKit().unifiedBalance.deposit({
+    from: { adapter: unifiedBalanceAdapter(), chain: quote.sourceChain },
+    amount: quote.amount,
+    token: 'USDC',
+  })
+  const txHash = findTransactionHash(result)
+  return {
+    status: txHash ? 'submitted' : 'completed',
+    action: quote.action,
+    ownerAddress: quote.ownerAddress,
+    sourceChain: quote.sourceChain,
+    token: 'USDC',
+    amount: quote.amount,
+    txHash: txHash || null,
+    explorerUrl: txHash ? unifiedBalanceExplorer(quote.sourceChain, txHash) : null,
+    result,
+    safeNextStep: 'Check Unified Balance until the deposit appears as confirmed or pending.',
+  }
+}
+
+export async function quoteAiRouterAutoPay(input = {}) {
+  const account = privateKeyToAccount(privateKey())
+  const enabled = input.enabled !== false
+  const status = await getAiRouterStatus({ ownerAddress: account.address })
+  const delegateAddress = String(status?.delegate?.address || status?.autoPay?.delegateAddress || '').trim()
+  if (!/^0x[a-fA-F0-9]{40}$/.test(delegateAddress)) throw new Error('AI Router Auto Pay address is not configured in backend.')
+  return {
+    status: 'quote',
+    action: 'set_ai_router_auto_pay',
+    ownerAddress: account.address,
+    enabled,
+    currentStatus: status?.autoPay?.status || status?.delegate?.status || 'not_configured',
+    autoPayAddress: delegateAddress,
+    source: 'Unified Balance only',
+    chain: 'Arc_Testnet',
+    requiresWalletTransaction: delegateAddress.toLowerCase() !== account.address.toLowerCase(),
+    requiresUserConfirmation: true,
+    safeNextStep: `Show this Auto Pay ${enabled ? 'enable' : 'disable'} preview, then execute only after the user replies yes or ya.`,
+  }
+}
+
+export async function setAiRouterAutoPay(input = {}) {
+  if (input.confirmed !== true || input.mcpPreviewVerified !== true) return quoteAiRouterAutoPay(input)
+  const quote = await quoteAiRouterAutoPay(input)
+  const account = privateKeyToAccount(privateKey())
+  let transactionResult = null
+  if (quote.autoPayAddress.toLowerCase() !== account.address.toLowerCase()) {
+    transactionResult = quote.enabled
+      ? await unifiedBalanceKit().unifiedBalance.addDelegate({
+        from: { adapter: unifiedBalanceAdapter(), chain: 'Arc_Testnet' },
+        delegateAddress: quote.autoPayAddress,
+      })
+      : await unifiedBalanceKit().unifiedBalance.removeDelegate({
+        from: { adapter: unifiedBalanceAdapter(), chain: 'Arc_Testnet' },
+        delegateAddress: quote.autoPayAddress,
+      })
+  }
+  const token = await backendSession(account)
+  const policy = await postJson('/api/ai-router/auto-pay', {
+    ownerAddress: account.address,
+    enabled: quote.enabled,
+    delegateStatus: quote.enabled ? 'ready' : 'not_configured',
+    delegateAddress: quote.autoPayAddress,
+  }, token, 30_000)
+  const txHash = findTransactionHash(transactionResult)
+  return {
+    status: quote.enabled ? 'ready' : 'off',
+    action: quote.action,
+    ownerAddress: account.address,
+    enabled: quote.enabled,
+    autoPayAddress: quote.autoPayAddress,
+    source: 'Unified Balance only',
+    txHash: txHash || null,
+    explorerUrl: txHash ? EXPLORER_TX + txHash : null,
+    autoPay: policy.autoPay,
   }
 }
 
 export async function createAiApiKey(input = {}) {
-  const ownerAddress = String(input.ownerAddress || input.address || '').trim()
-  if (!ownerAddress) throw new Error('ownerAddress is required.')
+  const ownerAddress = agentOwnerAddress(input)
   const account = privateKeyToAccount(privateKey())
   if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match local AGENT_PRIVATE_KEY signer.')
   const token = await backendSession(account)
   return postJson('/api/ai-router/api-keys', { ownerAddress, label: input.label || 'ARCOX MCP AI Router' }, token)
+}
+
+export async function deleteAiApiKey(input = {}) {
+  const ownerAddress = agentOwnerAddress(input)
+  const keyId = String(input.keyId || input.id || '').trim()
+  if (!keyId) throw new Error('keyId is required.')
+  const account = privateKeyToAccount(privateKey())
+  if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match local AGENT_PRIVATE_KEY signer.')
+  const token = await backendSession(account)
+  return postJson(`/api/ai-router/api-keys/${encodeURIComponent(keyId)}/revoke`, { ownerAddress }, token)
+}
+
+function unifiedBalanceKit() {
+  if (!agentAppKit) agentAppKit = new AppKit()
+  return agentAppKit
+}
+
+function unifiedBalanceAdapter() {
+  if (!agentUnifiedBalanceAdapter) agentUnifiedBalanceAdapter = createViemAdapterFromPrivateKey({ privateKey: privateKey() })
+  return agentUnifiedBalanceAdapter
+}
+
+function normalizeUnifiedBalanceChain(value) {
+  const normalized = normalizeChainName(value) || String(value || '')
+  if (!UNIFIED_BALANCE_CHAINS.has(normalized)) throw new Error(`Unsupported Unified Balance deposit chain: ${value}`)
+  return normalized
+}
+
+function findTransactionHash(value, depth = 0) {
+  if (!value || depth > 4) return ''
+  if (typeof value === 'string') return /^0x[a-fA-F0-9]{64}$/.test(value) ? value : ''
+  if (typeof value !== 'object') return ''
+  for (const key of ['txHash', 'transactionHash', 'hash', 'sourceTxHash', 'depositTxHash']) {
+    const candidate = value[key]
+    if (typeof candidate === 'string' && /^0x[a-fA-F0-9]{64}$/.test(candidate)) return candidate
+  }
+  for (const child of Object.values(value)) {
+    const candidate = findTransactionHash(child, depth + 1)
+    if (candidate) return candidate
+  }
+  return ''
+}
+
+function unifiedBalanceExplorer(chain, txHash) {
+  const explorers = {
+    Arc_Testnet: EXPLORER_TX,
+    Base_Sepolia: 'https://sepolia.basescan.org/tx/',
+    Ethereum_Sepolia: 'https://sepolia.etherscan.io/tx/',
+    Arbitrum_Sepolia: 'https://sepolia.arbiscan.io/tx/',
+  }
+  return `${explorers[chain] || EXPLORER_TX}${txHash}`
 }
 
 export async function listAiModels() {
@@ -1089,10 +1253,14 @@ export async function listAiModels() {
 }
 
 export async function getUsageLogs(input = {}) {
-  const ownerAddress = String(input.ownerAddress || input.address || '').trim()
-  if (!ownerAddress) throw new Error('ownerAddress is required.')
+  const ownerAddress = agentOwnerAddress(input)
   const limit = Number(input.limit || 10)
   return arcoxApiGetJson(`/api/ai-router/usage?ownerAddress=${encodeURIComponent(ownerAddress)}&limit=${encodeURIComponent(String(limit))}`)
+}
+
+function agentOwnerAddress(input = {}) {
+  const explicit = String(input.ownerAddress || input.address || '').trim()
+  return explicit || privateKeyToAccount(privateKey()).address
 }
 
 export async function callAiModel(input = {}) {
@@ -2361,38 +2529,48 @@ async function executeEoaPreparedSwap({ owner, tokenIn, tokenOut, apiTokenIn, ap
     amountIn: amount,
   }, authToken, SWAP_EXECUTION_TIMEOUT_MS)
   const adapterContract = getAddress(prepared.adapterContract || ARC_APPKIT_ADAPTER)
-  const tokenInAddress = getAddress(prepared.tokenInAddress || ARC_TOKENS[tokenIn].address)
-  const amountBaseUnits = BigInt(prepared.amountBaseUnits)
-  const approveTx = await walletClient.writeContract({
-    address: tokenInAddress,
-    abi: erc20Abi,
-    functionName: 'approve',
-    args: [adapterContract, amountBaseUnits],
+  if (!Array.isArray(prepared.legs) || prepared.legs.length === 0) throw new Error('Backend did not return executable swap legs.')
+  const executableLegs = prepared.legs.map((leg, index) => {
+    const tokenAddress = getAddress(leg.tokenInAddress)
+    const amountBaseUnits = BigInt(leg.amountBaseUnits || 0)
+    const executionParams = normalizeAdapterExecutionParams(leg.executionParams)
+    if (amountBaseUnits <= 0n || !executionParams.instructions.length || !/^0x[a-fA-F0-9]+$/.test(String(leg.signature || ''))) {
+      throw new Error(`Swap leg ${index + 1} is incomplete; no transaction was submitted.`)
+    }
+    return { ...leg, tokenAddress, amountBaseUnits, executionParams }
   })
-  await publicClient.waitForTransactionReceipt({ hash: approveTx })
-  const executionParams = normalizeAdapterExecutionParams(prepared.executionParams)
-  const tokenInputs = [{
-    permitType: 0,
-    token: tokenInAddress,
-    amount: amountBaseUnits,
-    permitCalldata: '0x',
-  }]
-  const data = encodeFunctionData({
-    abi: adapterExecuteAbi,
-    functionName: 'execute',
-    args: [executionParams, tokenInputs, prepared.signature],
-  })
-  const gas = prepared.gasLimit ? (BigInt(prepared.gasLimit) * 120n) / 100n : undefined
-  const swapTx = await walletClient.sendTransaction({
-    to: adapterContract,
-    data,
-    ...(gas ? { gas } : {}),
-  })
-  await publicClient.waitForTransactionReceipt({ hash: swapTx })
+  const steps = []
+  let approveTx = ''
+  let swapTx = ''
+  for (const leg of executableLegs) {
+    approveTx = await walletClient.writeContract({
+      address: leg.tokenAddress,
+      abi: erc20Abi,
+      functionName: 'approve',
+      args: [adapterContract, leg.amountBaseUnits],
+    })
+    await publicClient.waitForTransactionReceipt({ hash: approveTx })
+    steps.push({ name: `Approve ${leg.tokenIn}`, status: 'success', txHash: approveTx, explorerUrl: EXPLORER_TX + approveTx })
+    const data = encodeFunctionData({
+      abi: adapterExecuteAbi,
+      functionName: 'execute',
+      args: [leg.executionParams, [{
+        permitType: 0,
+        token: leg.tokenAddress,
+        amount: leg.amountBaseUnits,
+        permitCalldata: '0x',
+      }], leg.signature],
+    })
+    const gas = leg.gasLimit ? (BigInt(leg.gasLimit) * 120n) / 100n : undefined
+    swapTx = await walletClient.sendTransaction({ to: adapterContract, data, ...(gas ? { gas } : {}) })
+    await publicClient.waitForTransactionReceipt({ hash: swapTx })
+    steps.push({ name: `${leg.tokenIn} -> ${leg.tokenOut}`, status: 'success', txHash: swapTx, explorerUrl: EXPLORER_TX + swapTx, amountOut: leg.amountOut })
+  }
   let feeTx = ''
   let platformFeeError = ''
   const feeAmount = String(prepared.platformFee?.amount || '0')
   const feeUnits = parseUnits(feeAmount, ARC_TOKENS[tokenIn].decimals)
+  const tokenInAddress = getAddress(ARC_TOKENS[tokenIn].address)
   if (feeUnits > 0n) {
     try {
       feeTx = await walletClient.writeContract({
@@ -2425,6 +2603,7 @@ async function executeEoaPreparedSwap({ owner, tokenIn, tokenOut, apiTokenIn, ap
       amountIn: prepared.amountIn,
       amountOut: prepared.amountOut,
       grossAmountIn: prepared.grossAmountIn,
+      steps,
       platformFee: {
         ...prepared.platformFee,
         txHash: feeTx || undefined,
@@ -2946,8 +3125,17 @@ export async function quoteSwap(intent) {
     tokenOut,
     amountIn,
     quote,
+    routeAvailable: quote.available !== false,
+    route: quote.route || `${tokenIn} -> ${tokenOut}`,
+    provider: quote.provider || quote.source || null,
+    estimatedReceive: quote.amountOut || null,
+    minimumReceive: quote.minAmountOut || null,
+    rate: quote.rate ?? null,
+    platformFee: quote.platformFee || null,
     approvalRequired: true,
-    safeNextStep: 'Ask the user to confirm before calling arcox_execute_swap with confirmed=true.',
+    safeNextStep: quote.available === false
+      ? 'This route is unavailable. Do not execute; try another supported pair or amount.'
+      : 'Route is available. Show the preview and ask the user to confirm before calling arcox_execute_swap with confirmed=true, previewId, and confirmationText.',
   }
 }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.21
+
+- Add live Unified Balance reads and confirmed AppKit deposit tools for the local agent signer.
+- Add previewed Auto Pay on/off tools plus AI Router API key create/delete support.
+- Fix MCP EOA swap execution to process backend `legs[]` calldata and expose route availability clearly.
+
 ## 0.1.20
 
 - Present paid ARCOX Intel results as labeled MCP sections instead of raw or unlabeled values.

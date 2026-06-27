@@ -47,6 +47,10 @@ Tools:
 - `arcox_execute_send`: executes a confirmed Arc token send. Without `confirmed: true`, it returns a quote only.
 - `arcox_quote_swap`: quotes an Arc swap. Default source is the local EOA agent wallet; use `source="circle"` only when the user explicitly asks for Circle proxy wallet.
 - `arcox_execute_swap`: executes a confirmed Arc swap. EOA uses local `AGENT_PRIVATE_KEY` to sign approve and Circle AppKit adapter execute transactions. Without `confirmed: true`, it returns a quote only.
+- `get_unified_balance`: reads live Circle Gateway Unified Balance and pending deposits for the local signer by default.
+- `quote_unified_balance_deposit`, `deposit_unified_balance`: preview and execute a real testnet USDC deposit with explicit confirmation.
+- `quote_ai_router_auto_pay`, `set_ai_router_auto_pay`: preview and enable/disable Unified Balance Auto Pay with explicit confirmation.
+- `create_ai_api_key`, `delete_ai_api_key`: create or revoke an ARCOX AI Router key for the local signer.
 - `arcox_create_payment_request`: creates an ARCOX Pay public USDC invoice/payment link on Arc Testnet.
 - `arcox_get_payment_request`, `arcox_quote_payment_request`, `arcox_pay_payment_request`, `arcox_check_payment_status`: read, quote, pay, and track ARCOX Pay invoices.
 - `arcox_x402_invoice_status`: checks internal ARCOX x402 invoices paid by Arc memo/ERC20 reconciliation or compatible Circle inbound webhook.

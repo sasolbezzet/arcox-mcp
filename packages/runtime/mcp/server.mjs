@@ -11,6 +11,7 @@ import {
   callAiModel,
   completeAgentJob,
   createAiApiKey,
+  deleteAiApiKey,
   createAgentJob,
   createPaymentRequest,
   executeConfirmedBridge,
@@ -36,6 +37,8 @@ import {
   payGetPaymentStatus,
   payListRecentPayments,
   quoteBridge,
+  quoteAiRouterAutoPay,
+  quoteUnifiedBalanceDeposit,
   quoteEcoRoutePayment,
   quotePaymentRequest,
   quoteSend,
@@ -44,9 +47,11 @@ import {
   readJob,
   registerAgentIdentity,
   setAgentJobBudget,
+  setAiRouterAutoPay,
   simulateCircleWebhook,
   submitAgentJob,
   transactionHistory,
+  depositUnifiedBalance,
   walletBalances,
   x402InvoiceStatus,
   x402PayInvoice,
@@ -109,6 +114,11 @@ const executionGuide = {
       intent: 'x402 intel',
       steps: ['arcox_intel_get_address/tx/contract/entity/token/search to get invoice', 'arcox_x402_pay_invoice without confirmed to get previewId', 'show exact amount/recipient/resource', 'user yes', 'arcox_x402_pay_invoice with confirmed=true, previewId, confirmationText', 'return unlockedResult immediately', 'present mcpDisplay with payment receipt, overview, every labeled section and data quality'],
       never: ['Do not execute x402 payment without previewId.', 'Do not ask user to submit txHash manually.', 'Do not reduce a paid result to unlabeled numbers or omit available fields.'],
+    },
+    {
+      intent: 'ai router setup',
+      steps: ['get_unified_balance', 'quote_unified_balance_deposit when funding is needed', 'show deposit preview', 'user yes', 'deposit_unified_balance with confirmed=true, previewId, confirmationText', 'quote_ai_router_auto_pay', 'show Auto Pay preview', 'user yes', 'set_ai_router_auto_pay with confirmed=true, previewId, confirmationText', 'create_ai_api_key'],
+      never: ['Do not deposit or change Auto Pay before preview and explicit yes/ya.', 'Do not expose AGENT_PRIVATE_KEY or provider API keys.', 'Do not spend from a normal wallet for AI requests; AI request payment uses Unified Balance.'],
     },
     {
       intent: 'payment request',
@@ -267,21 +277,73 @@ const tools = [
   },
   {
     name: 'get_ai_router_status',
-    description: 'Get ARCOX AI Router status: Unified Balance availability, Auto Pay status, delegate status, API key status, usage log, and models.',
+    description: 'Get ARCOX AI Router status for ownerAddress or the local AGENT_PRIVATE_KEY owner by default.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' } },
-      required: ['ownerAddress'],
       additionalProperties: false,
     },
   },
   {
     name: 'get_unified_balance',
-    description: 'Get AI Router Unified Balance/delegate status for an owner. Browser wallet live Unified Balance is checked in Web UI.',
+    description: 'Get live Circle Gateway Unified Balance, pending deposits, chain breakdown, and Auto Pay status. Defaults to local AGENT_PRIVATE_KEY owner.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' } },
-      required: ['ownerAddress'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'quote_unified_balance_deposit',
+    description: 'Preview a real testnet USDC deposit from the local AGENT_PRIVATE_KEY wallet into Circle Gateway Unified Balance. Does not transact.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'string' },
+        chain: { type: 'string', enum: ['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'], default: 'Arc_Testnet' },
+      },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'deposit_unified_balance',
+    description: 'Execute a confirmed real testnet USDC Unified Balance deposit using local AGENT_PRIVATE_KEY. Requires previewId and explicit yes/ya after quote_unified_balance_deposit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'string' },
+        chain: { type: 'string', enum: ['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'], default: 'Arc_Testnet' },
+        previewId: { type: 'string' },
+        confirmed: { type: 'boolean' },
+        confirmationText: { type: 'string', enum: ['yes', 'ya'], description: 'Copy the user immediate explicit yes/ya reply after showing this preview.' },
+      },
+      required: ['amount', 'previewId', 'confirmed', 'confirmationText'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'quote_ai_router_auto_pay',
+    description: 'Preview enabling or disabling AI Router Auto Pay for the local agent wallet. Auto Pay grants or removes Unified Balance delegated spending only.',
+    inputSchema: {
+      type: 'object',
+      properties: { enabled: { type: 'boolean' } },
+      required: ['enabled'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'set_ai_router_auto_pay',
+    description: 'Enable or disable AI Router Auto Pay after an explicit preview confirmation. Uses local AGENT_PRIVATE_KEY to update the Unified Balance delegate and authenticated backend policy.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        enabled: { type: 'boolean' },
+        previewId: { type: 'string' },
+        confirmed: { type: 'boolean' },
+        confirmationText: { type: 'string', enum: ['yes', 'ya'], description: 'Copy the user immediate explicit yes/ya reply after showing this preview.' },
+      },
+      required: ['enabled', 'previewId', 'confirmed', 'confirmationText'],
       additionalProperties: false,
     },
   },
@@ -291,7 +353,16 @@ const tools = [
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' }, label: { type: 'string' } },
-      required: ['ownerAddress'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'delete_ai_api_key',
+    description: 'Delete/revoke an ARCOX AI Router API key owned by the local AGENT_PRIVATE_KEY wallet.',
+    inputSchema: {
+      type: 'object',
+      properties: { ownerAddress: { type: 'string' }, keyId: { type: 'string' } },
+      required: ['keyId'],
       additionalProperties: false,
     },
   },
@@ -316,11 +387,10 @@ const tools = [
   },
   {
     name: 'get_usage_logs',
-    description: 'Get ARCOX AI Router usage logs for an owner.',
+    description: 'Get ARCOX AI Router usage logs. Defaults to local AGENT_PRIVATE_KEY owner.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' }, limit: { type: 'number', default: 10 } },
-      required: ['ownerAddress'],
       additionalProperties: false,
     },
   },
@@ -673,9 +743,9 @@ const tools = [
         source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
         previewId: { type: 'string' },
         confirmed: { type: 'boolean' },
-        confirmationText: { type: 'string' },
+        confirmationText: { type: 'string', enum: ['yes', 'ya'], description: 'Copy the user immediate explicit yes/ya reply after showing the swap preview.' },
       },
-      required: ['tokenIn', 'tokenOut', 'amountIn'],
+      required: ['tokenIn', 'tokenOut', 'amountIn', 'previewId', 'confirmed', 'confirmationText'],
       additionalProperties: false,
     },
   },
@@ -879,7 +949,7 @@ async function agentJob(args) {
   throw new Error(`Unsupported agent job operation: ${args.operation}`)
 }
 
-const valueMovingTools = new Set(['arcox_execute_bridge', 'arcox_execute_send', 'arcox_execute_swap', 'arcox_pay_payment_request', 'arcox_x402_pay_invoice'])
+const valueMovingTools = new Set(['arcox_execute_bridge', 'arcox_execute_send', 'arcox_execute_swap', 'arcox_pay_payment_request', 'arcox_x402_pay_invoice', 'deposit_unified_balance', 'set_ai_router_auto_pay'])
 const valueMovingJobOps = new Set(['register-agent', 'create-job', 'set-budget', 'fund', 'submit', 'complete'])
 const rateLimitBuckets = new Map()
 const RATE_LIMIT_WINDOW_MS = 60_000
@@ -917,6 +987,7 @@ function stableJson(value) {
 }
 
 function spendAmountFor(name, args) {
+  if (name === 'deposit_unified_balance') return Number(args.amount || 0)
   if (name.includes('swap')) return Number(args.amountIn || args.amount || 0)
   if (name.includes('send') || name.includes('bridge')) return Number(args.amount || 0)
   if (name === 'arcox_pay_payment_request') return Number(args.amount || 0)
@@ -958,6 +1029,8 @@ function canonicalSource(value, fallback = 'eoa') {
 
 function canonicalPreviewAction(name) {
   if (name === 'arcox_quote_payment_request') return 'arcox_pay_payment_request'
+  if (name === 'quote_unified_balance_deposit') return 'deposit_unified_balance'
+  if (name === 'quote_ai_router_auto_pay') return 'set_ai_router_auto_pay'
   return name.replace('quote', 'execute')
 }
 
@@ -1006,6 +1079,17 @@ function canonicalPreviewArgs(name, args) {
       invoiceId: String(args.invoiceId || ''),
       paymentId: String(args.paymentId || ''),
     }
+  }
+  if (action === 'deposit_unified_balance') {
+    return {
+      action,
+      amount: canonicalAmount(args.amount),
+      chain: normalizeMcpChain(args.chain || args.sourceChain) || args.chain || args.sourceChain || 'Arc_Testnet',
+      token: 'USDC',
+    }
+  }
+  if (action === 'set_ai_router_auto_pay') {
+    return { action, enabled: args.enabled === true }
   }
   return { action, ...args }
 }
@@ -1124,7 +1208,7 @@ async function rpcResponse(message) {
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false },
         },
-        serverInfo: { name: 'arcox-mcp', version: '0.1.5' },
+        serverInfo: { name: 'arcox-mcp', version: '0.1.21' },
       },
     }
   }
@@ -1145,7 +1229,21 @@ async function rpcResponse(message) {
     if (name === 'arcox_wallet_balances') return result(id, await walletBalances())
     if (name === 'get_ai_router_status') return result(id, await getAiRouterStatus(args))
     if (name === 'get_unified_balance') return result(id, await getUnifiedBalance(args))
+    if (name === 'quote_unified_balance_deposit') return result(id, attachPreview(name, args, await quoteUnifiedBalanceDeposit(args)))
+    if (name === 'deposit_unified_balance' && args.confirmed !== true) return result(id, attachPreview('quote_unified_balance_deposit', args, await quoteUnifiedBalanceDeposit(args)))
+    if (name === 'deposit_unified_balance') {
+      enforcePreview(name, args)
+      enforceSpendLimits(name, args)
+      return result(id, await runValueMovingTool(name, args, () => depositUnifiedBalance({ ...args, mcpPreviewVerified: true })))
+    }
+    if (name === 'quote_ai_router_auto_pay') return result(id, attachPreview(name, args, await quoteAiRouterAutoPay(args)))
+    if (name === 'set_ai_router_auto_pay' && args.confirmed !== true) return result(id, attachPreview('quote_ai_router_auto_pay', args, await quoteAiRouterAutoPay(args)))
+    if (name === 'set_ai_router_auto_pay') {
+      enforcePreview(name, args)
+      return result(id, await runValueMovingTool(name, args, () => setAiRouterAutoPay({ ...args, mcpPreviewVerified: true })))
+    }
     if (name === 'create_ai_api_key') return result(id, await createAiApiKey(args))
+    if (name === 'delete_ai_api_key') return result(id, await deleteAiApiKey(args))
     if (name === 'list_ai_models') return result(id, await listAiModels(args))
     if (name === 'call_ai_model') return result(id, await callAiModel(args))
     if (name === 'get_usage_logs') return result(id, await getUsageLogs(args))
