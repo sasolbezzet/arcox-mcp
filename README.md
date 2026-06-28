@@ -189,6 +189,7 @@ Agent Jobs require an owned active Arc ERC-8004 identity. `create_agent_job` use
 ARCOX AI Router:
 
 - MCP can deposit testnet USDC to Unified Balance and enable/disable Auto Pay with preview and explicit confirmation.
+- Auto Pay setup covers each funded EVM source chain; delegated AI spends use only chains whose authorization is ready.
 - API keys use `arx_sk_...`; backend stores only hashes.
 - MCP can create a key with the local `AGENT_PRIVATE_KEY` owner session.
 - MCP can call models with `ARCOX_AI_ROUTER_API_KEY`; each request is paid from user Unified Balance through backend delegated spend.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.24
+
+- Configure AI Router Auto Pay for every funded EVM Unified Balance source chain.
+- Report per-chain delegate readiness and transaction results.
+
 ## 0.1.23
 
 - Add Arc ERC-8004 identity discovery and active identity selection tools.

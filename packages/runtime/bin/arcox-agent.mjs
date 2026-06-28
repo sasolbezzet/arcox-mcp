@@ -1153,9 +1153,16 @@ export async function depositUnifiedBalance(input = {}) {
 export async function quoteAiRouterAutoPay(input = {}) {
   const account = privateKeyToAccount(privateKey())
   const enabled = input.enabled !== false
-  const status = await getAiRouterStatus({ ownerAddress: account.address })
+  const [status, balance] = await Promise.all([
+    getAiRouterStatus({ ownerAddress: account.address }),
+    getUnifiedBalance({ ownerAddress: account.address }),
+  ])
   const delegateAddress = String(status?.delegate?.address || status?.autoPay?.delegateAddress || '').trim()
   if (!/^0x[a-fA-F0-9]{40}$/.test(delegateAddress)) throw new Error('AI Router Auto Pay address is not configured in backend.')
+  const fundedChains = unifiedBalanceFundedChains(balance)
+  const configuredChains = (status?.autoPay?.delegateChains || []).map(item => item.chain).filter(Boolean)
+  const sourceChains = enabled ? fundedChains : [...new Set([...configuredChains, ...fundedChains])]
+  if (enabled && !sourceChains.length) throw new Error('Deposit USDC to Unified Balance before enabling Auto Pay.')
   return {
     status: 'quote',
     action: 'set_ai_router_auto_pay',
@@ -1164,7 +1171,7 @@ export async function quoteAiRouterAutoPay(input = {}) {
     currentStatus: status?.autoPay?.status || status?.delegate?.status || 'not_configured',
     autoPayAddress: delegateAddress,
     source: 'Unified Balance only',
-    chain: 'Arc_Testnet',
+    sourceChains,
     requiresWalletTransaction: delegateAddress.toLowerCase() !== account.address.toLowerCase(),
     requiresUserConfirmation: true,
     safeNextStep: `Show this Auto Pay ${enabled ? 'enable' : 'disable'} preview, then execute only after the user replies yes or ya.`,
@@ -1175,37 +1182,71 @@ export async function setAiRouterAutoPay(input = {}) {
   if (input.confirmed !== true || input.mcpPreviewVerified !== true) return quoteAiRouterAutoPay(input)
   const quote = await quoteAiRouterAutoPay(input)
   const account = privateKeyToAccount(privateKey())
-  let transactionResult = null
+  const transactions = []
+  const delegateChains = []
   if (quote.autoPayAddress.toLowerCase() !== account.address.toLowerCase()) {
-    transactionResult = quote.enabled
-      ? await unifiedBalanceKit().unifiedBalance.addDelegate({
-        from: { adapter: unifiedBalanceAdapter(), chain: 'Arc_Testnet' },
-        delegateAddress: quote.autoPayAddress,
-      })
-      : await unifiedBalanceKit().unifiedBalance.removeDelegate({
-        from: { adapter: unifiedBalanceAdapter(), chain: 'Arc_Testnet' },
-        delegateAddress: quote.autoPayAddress,
-      })
+    for (const chain of quote.sourceChains) {
+      try {
+        let status = await unifiedBalanceKit().unifiedBalance.getDelegateStatus({
+          from: { adapter: unifiedBalanceAdapter(), chain },
+          delegateAddress: quote.autoPayAddress,
+        })
+        if (quote.enabled && status === 'none') {
+          const result = await unifiedBalanceKit().unifiedBalance.addDelegate({ from: { adapter: unifiedBalanceAdapter(), chain }, delegateAddress: quote.autoPayAddress })
+          transactions.push({ chain, txHash: findTransactionHash(result) || null })
+          for (let attempt = 0; attempt < 4; attempt += 1) {
+            status = await unifiedBalanceKit().unifiedBalance.getDelegateStatus({ from: { adapter: unifiedBalanceAdapter(), chain }, delegateAddress: quote.autoPayAddress })
+            if (status === 'ready' || status === 'none') break
+            await sleep(3000)
+          }
+        } else if (!quote.enabled && status !== 'none') {
+          const result = await unifiedBalanceKit().unifiedBalance.removeDelegate({ from: { adapter: unifiedBalanceAdapter(), chain }, delegateAddress: quote.autoPayAddress })
+          transactions.push({ chain, txHash: findTransactionHash(result) || null })
+          status = 'none'
+        }
+        delegateChains.push({ chain, status: normalizeDelegateStatus(status) })
+      } catch (error) {
+        delegateChains.push({ chain, status: 'not_configured', error: String(error?.message || error).slice(0, 180) })
+      }
+    }
+  } else {
+    delegateChains.push(...quote.sourceChains.map(chain => ({ chain, status: quote.enabled ? 'ready' : 'not_configured' })))
   }
+  const ready = delegateChains.some(item => item.status === 'ready')
   const token = await backendSession(account)
   const policy = await postJson('/api/ai-router/auto-pay', {
     ownerAddress: account.address,
-    enabled: quote.enabled,
-    delegateStatus: quote.enabled ? 'ready' : 'not_configured',
+    enabled: quote.enabled && ready,
+    delegateStatus: quote.enabled ? ready ? 'ready' : delegateChains.some(item => item.status === 'pending') ? 'pending' : 'not_configured' : 'not_configured',
     delegateAddress: quote.autoPayAddress,
+    delegateChains,
   }, token, 30_000)
-  const txHash = findTransactionHash(transactionResult)
   return {
-    status: quote.enabled ? 'ready' : 'off',
+    status: quote.enabled ? ready ? 'ready' : 'pending' : 'off',
     action: quote.action,
     ownerAddress: account.address,
     enabled: quote.enabled,
     autoPayAddress: quote.autoPayAddress,
     source: 'Unified Balance only',
-    txHash: txHash || null,
-    explorerUrl: txHash ? EXPLORER_TX + txHash : null,
+    delegateChains,
+    transactions,
     autoPay: policy.autoPay,
   }
+}
+
+function unifiedBalanceFundedChains(balance) {
+  const supported = new Set(['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'])
+  return (balance?.breakdown || [])
+    .flatMap(source => source?.breakdown || [])
+    .filter(item => supported.has(item?.chain) && Number(item?.confirmedBalance || 0) > 0)
+    .map(item => item.chain)
+}
+
+function normalizeDelegateStatus(value) {
+  const status = String(value || '').toLowerCase()
+  if (status === 'ready') return 'ready'
+  if (status === 'pending') return 'pending'
+  return 'not_configured'
 }
 
 export async function createAiApiKey(input = {}) {
