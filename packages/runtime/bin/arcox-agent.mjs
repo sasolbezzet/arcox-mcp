@@ -1070,6 +1070,25 @@ export async function getAiRouterStatus(input = {}) {
   return arcoxApiGetJson(`/api/ai-router/status?ownerAddress=${encodeURIComponent(ownerAddress)}`)
 }
 
+export async function listAgentIdentities(input = {}) {
+  const ownerAddress = agentOwnerAddress(input)
+  return arcoxApiGetJson(`/api/ai-router/agent-identities?ownerAddress=${encodeURIComponent(ownerAddress)}${input.refresh ? '&refresh=true' : ''}`)
+}
+
+export async function getAgentIdentity(input = {}) {
+  if (input.agentId) return readAgent(input.agentId)
+  const data = await listAgentIdentities(input)
+  return data.activeAgentIdentity || { status: 'not_found', ownerAddress: agentOwnerAddress(input), message: 'Agent Identity required for Agent Jobs' }
+}
+
+export async function selectAgentIdentity(input = {}) {
+  const agentId = String(input.agentId || '').trim()
+  if (!/^\d+$/.test(agentId)) throw new Error('agentId is required.')
+  const account = privateKeyToAccount(privateKey())
+  const token = await backendSession(account)
+  return postJson('/api/ai-router/agent-identities/select', { ownerAddress: account.address, agentId }, token)
+}
+
 export async function getUnifiedBalance(input = {}) {
   const ownerAddress = agentOwnerAddress(input)
   const [status, balance] = await Promise.all([
@@ -1195,6 +1214,48 @@ export async function createAiApiKey(input = {}) {
   if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match local AGENT_PRIVATE_KEY signer.')
   const token = await backendSession(account)
   return postJson('/api/ai-router/api-keys', { ownerAddress, label: input.label || 'ARCOX MCP AI Router' }, token)
+}
+
+export async function createIdentityBoundAgentJob(input = {}) {
+  const account = privateKeyToAccount(privateKey())
+  const identityData = await listAgentIdentities({ ownerAddress: account.address })
+  const identity = identityData.activeAgentIdentity
+  if (!identity?.agentId) throw new Error('Agent Identity required for Agent Jobs')
+  if (input.confirmed !== true || input.mcpPreviewVerified !== true) {
+    return {
+      status: 'preview',
+      action: 'create_agent_job',
+      agentId: identity.agentId,
+      ownerWallet: account.address,
+      provider: input.provider || account.address,
+      evaluator: input.evaluator || account.address,
+      hours: Number(input.hours || 24),
+      requiresUserConfirmation: true,
+    }
+  }
+  const result = await createAgentJob({ ...input, agentId: identity.agentId, provider: input.provider || account.address, evaluator: input.evaluator || account.address })
+  const apiKey = String(input.apiKey || process.env.ARCOX_AI_ROUTER_API_KEY || '').trim()
+  if (apiKey.startsWith('arx_sk_')) {
+    await fetch(`${ARCOX_API_BASE_URL}/api/ai-router/agent-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, 'X-ARCOX-AGENT-ID': identity.agentId },
+      body: JSON.stringify({ agentId: identity.agentId, jobId: result.jobId, txHash: result.tx, memoId: result.memoId, status: 'created' }),
+      signal: AbortSignal.timeout(BACKEND_FETCH_TIMEOUT_MS),
+    }).catch(() => null)
+  }
+  return { ...result, agentId: identity.agentId, ownerWallet: account.address }
+}
+
+export async function listIdentityBoundAgentJobs(input = {}) {
+  const apiKey = String(input.apiKey || process.env.ARCOX_AI_ROUTER_API_KEY || '').trim()
+  if (!apiKey.startsWith('arx_sk_')) throw new Error('ARCOX_AI_ROUTER_API_KEY is required to list identity-bound jobs.')
+  const response = await fetch(`${ARCOX_API_BASE_URL}/api/ai-router/agent-jobs?limit=${encodeURIComponent(String(input.limit || 50))}`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(BACKEND_FETCH_TIMEOUT_MS),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok || data.error) throw new Error(data?.error?.message || data.error || `HTTP ${response.status}`)
+  return data
 }
 
 export async function deleteAiApiKey(input = {}) {
@@ -3583,10 +3644,16 @@ export async function intelExecuteWalletReport(input = {}) {
 }
 
 async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
+  const ownerAddress = privateKeyToAccount(privateKey()).address
+  const identities = await listAgentIdentities({ ownerAddress }).catch(() => ({}))
+  const identityHeaders = {
+    'X-ARCOX-OWNER': ownerAddress,
+    ...(identities.activeAgentIdentity?.agentId ? { 'X-ARCOX-AGENT-ID': identities.activeAgentIdentity.agentId } : {}),
+  }
   if (input.paymentId) {
-    const paidAttempt = await arcoxApiGetJson(path, { paymentId: input.paymentId }, timeoutMs)
+    const paidAttempt = await arcoxApiGetJson(path, { paymentId: input.paymentId, headers: identityHeaders }, timeoutMs)
     if (!paidAttempt.paymentRequired) return withIntelDisplay(paidAttempt)
-    const fresh = await arcoxApiGetJson(path, {}, timeoutMs)
+    const fresh = await arcoxApiGetJson(path, { headers: identityHeaders }, timeoutMs)
     const freshInvoice = fresh.x402 || fresh.invoice
     if (!fresh.paymentRequired || !freshInvoice?.invoiceId) return withIntelDisplay(fresh)
     return {
@@ -3597,7 +3664,7 @@ async function paidIntelRequest(path, input = {}, timeoutMs = 60_000) {
       safeNextStep: `Use new invoiceId=${freshInvoice.invoiceId}; do not keep retrying the old paymentId=${input.paymentId}.`,
     }
   }
-  const first = await arcoxApiGetJson(path, {}, timeoutMs)
+  const first = await arcoxApiGetJson(path, { headers: identityHeaders }, timeoutMs)
   const invoice = first.x402 || first.invoice
   if (!first.paymentRequired || !invoice?.invoiceId) return withIntelDisplay(first)
   return {
@@ -3920,48 +3987,62 @@ export async function registerAgentIdentity({ metadataUri }) {
   return { status: 'submitted', action: 'register-agent', tx: hash, explorer: EXPLORER_TX + hash, agentId: parseAgentId(receipt.logs, account.address), owner: account.address }
 }
 
-export async function createAgentJob({ provider, evaluator, description = 'ARCOX terminal agent job', hours = 24 }) {
-  const { walletClient } = wallet()
+async function writeAgentJobMemo({ agentId, functionName, args, jobId = '', requestId = '', amount = '' }) {
+  if (!/^\d+$/.test(String(agentId || ''))) throw new Error('Agent Identity required for Agent Jobs')
+  const { account, walletClient } = wallet()
+  const identity = await readAgent(agentId)
+  if (getAddress(identity.owner).toLowerCase() !== account.address.toLowerCase()) throw new Error('Agent identity mismatch')
+  const referenceId = String(jobId || requestId || `job-${Date.now()}`)
+  const memoId = keccak256(toHex(`${agentId}::${referenceId}`))
+  const memoData = toHex(JSON.stringify({
+    agentId: String(agentId),
+    ...(jobId ? { jobIdHash: keccak256(toHex(String(jobId))) } : { requestIdHash: keccak256(toHex(referenceId)) }),
+    service: 'agent_job',
+    ...(amount ? { amount: String(amount) } : {}),
+  }))
+  const data = encodeFunctionData({ abi: agenticCommerceAbi, functionName, args })
+  const hash = await walletClient.writeContract({ address: ARC_MEMO_CONTRACT, abi: memoAbi, functionName: 'memo', args: [AGENTIC_COMMERCE_CONTRACT, data, memoId, memoData] })
+  return { hash, memoId }
+}
+
+export async function createAgentJob({ agentId, provider, evaluator, description = 'ARCOX terminal agent job', hours = 24 }) {
   const normalizedProvider = getAddress(provider)
   const normalizedEvaluator = getAddress(evaluator)
   const expiredAt = BigInt(Math.floor(Date.now() / 1000) + (Number(hours) || 24) * 3600)
-  const hash = await walletClient.writeContract({ address: AGENTIC_COMMERCE_CONTRACT, abi: agenticCommerceAbi, functionName: 'createJob', args: [normalizedProvider, normalizedEvaluator, expiredAt, description, ZERO_ADDRESS] })
+  const { hash, memoId } = await writeAgentJobMemo({ agentId, functionName: 'createJob', args: [normalizedProvider, normalizedEvaluator, expiredAt, description, ZERO_ADDRESS], requestId: `create-${Date.now()}` })
   const receipt = await publicClient.waitForTransactionReceipt({ hash })
-  return { status: 'submitted', action: 'create-job', tx: hash, explorer: EXPLORER_TX + hash, jobId: parseJobId(receipt.logs), provider: normalizedProvider, evaluator: normalizedEvaluator }
+  return { status: 'submitted', action: 'create-job', tx: hash, memoId, explorer: EXPLORER_TX + hash, jobId: parseJobId(receipt.logs), provider: normalizedProvider, evaluator: normalizedEvaluator }
 }
 
-export async function setAgentJobBudget({ jobId, amount }) {
-  const { walletClient } = wallet()
-  const hash = await walletClient.writeContract({ address: AGENTIC_COMMERCE_CONTRACT, abi: agenticCommerceAbi, functionName: 'setBudget', args: [BigInt(jobId), parseUnits(String(amount), 6), '0x'] })
+export async function setAgentJobBudget({ agentId, jobId, amount }) {
+  const { hash, memoId } = await writeAgentJobMemo({ agentId, functionName: 'setBudget', args: [BigInt(jobId), parseUnits(String(amount), 6), '0x'], jobId, amount })
   await publicClient.waitForTransactionReceipt({ hash })
-  return { status: 'submitted', action: 'set-budget', jobId: String(jobId), amount: String(amount), tx: hash, explorer: EXPLORER_TX + hash }
+  return { status: 'submitted', action: 'set-budget', jobId: String(jobId), amount: String(amount), tx: hash, memoId, explorer: EXPLORER_TX + hash }
 }
 
-export async function fundAgentJob({ jobId, amount }) {
+export async function fundAgentJob({ agentId, jobId, amount }) {
   const { walletClient } = wallet()
   const parsedAmount = parseUnits(String(amount), 6)
   const parsedJobId = BigInt(jobId)
   const approveHash = await walletClient.writeContract({ address: ARC_USDC, abi: erc20Abi, functionName: 'approve', args: [AGENTIC_COMMERCE_CONTRACT, parsedAmount] })
   await publicClient.waitForTransactionReceipt({ hash: approveHash })
-  const fundHash = await walletClient.writeContract({ address: AGENTIC_COMMERCE_CONTRACT, abi: agenticCommerceAbi, functionName: 'fund', args: [parsedJobId, '0x'] })
+  const { hash: fundHash, memoId } = await writeAgentJobMemo({ agentId, functionName: 'fund', args: [parsedJobId, '0x'], jobId, amount })
   await publicClient.waitForTransactionReceipt({ hash: fundHash })
-  return { status: 'submitted', action: 'fund-job', jobId: String(jobId), amount: String(amount), approveTx: approveHash, fundTx: fundHash, explorer: EXPLORER_TX + fundHash }
+  return { status: 'submitted', action: 'fund-job', jobId: String(jobId), amount: String(amount), approveTx: approveHash, fundTx: fundHash, memoId, explorer: EXPLORER_TX + fundHash }
 }
 
-export async function submitAgentJob({ jobId, deliverable = 'terminal-agent-deliverable' }) {
-  const { walletClient } = wallet()
+export async function submitAgentJob({ agentId, jobId, deliverable = 'terminal-agent-deliverable' }) {
   const deliverableHash = hashTextBytes32(deliverable)
-  const hash = await walletClient.writeContract({ address: AGENTIC_COMMERCE_CONTRACT, abi: agenticCommerceAbi, functionName: 'submit', args: [BigInt(jobId), deliverableHash, '0x'] })
+  const { hash, memoId } = await writeAgentJobMemo({ agentId, functionName: 'submit', args: [BigInt(jobId), deliverableHash, '0x'], jobId })
   await publicClient.waitForTransactionReceipt({ hash })
-  return { status: 'submitted', action: 'submit-job', jobId: String(jobId), tx: hash, explorer: EXPLORER_TX + hash, deliverableHash }
+  return { status: 'submitted', action: 'submit-job', jobId: String(jobId), tx: hash, memoId, explorer: EXPLORER_TX + hash, deliverableHash }
 }
 
-export async function completeAgentJob({ jobId, reason = 'deliverable-approved' }) {
-  const { walletClient } = wallet()
+export async function completeAgentJob({ agentId, jobId, reason = 'deliverable-approved' }) {
   const reasonHash = hashTextBytes32(reason)
-  const hash = await walletClient.writeContract({ address: AGENTIC_COMMERCE_CONTRACT, abi: agenticCommerceAbi, functionName: 'complete', args: [BigInt(jobId), reasonHash, '0x'] })
+  const { hash, memoId } = await writeAgentJobMemo({ agentId, functionName: 'complete', args: [BigInt(jobId), reasonHash, '0x'], jobId })
   await publicClient.waitForTransactionReceipt({ hash })
-  return { status: 'submitted', action: 'complete-job', jobId: String(jobId), tx: hash, explorer: EXPLORER_TX + hash, reasonHash }
+  return { status: 'submitted', action: 'complete-job', jobId: String(jobId), tx: hash, memoId, explorer: EXPLORER_TX + hash, reasonHash }
 }
 
 async function serve() {

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.23
+
+- Add Arc ERC-8004 identity discovery and active identity selection tools.
+- Bind Agent Jobs and paid Intel requests to the selected owner identity.
+- Attach Arc Transaction Memos to identity-bound ERC-8183 job calls.
+- Require preview plus explicit `yes`/`ya` for both current and legacy Agent Job tools.
+
 ## 0.1.22
 
 - Persist quote previews across MCP process restarts so Hermes can execute the confirmed preview.

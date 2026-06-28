@@ -11,6 +11,7 @@ import {
   callAiModel,
   completeAgentJob,
   createAiApiKey,
+  createIdentityBoundAgentJob,
   deleteAiApiKey,
   createAgentJob,
   createPaymentRequest,
@@ -19,6 +20,7 @@ import {
   executeConfirmedSwap,
   fundAgentJob,
   getAiRouterStatus,
+  getAgentIdentity,
   getUnifiedBalance,
   getUsageLogs,
   getPaymentRequest,
@@ -31,6 +33,8 @@ import {
   intelQuoteWalletReport,
   intelSearch,
   listAiModels,
+  listAgentIdentities,
+  listIdentityBoundAgentJobs,
   makeAgentResponse,
   serviceCatalog,
   payPaymentRequest,
@@ -47,6 +51,7 @@ import {
   readJob,
   registerAgentIdentity,
   setAgentJobBudget,
+  selectAgentIdentity,
   setAiRouterAutoPay,
   simulateCircleWebhook,
   submitAgentJob,
@@ -132,8 +137,8 @@ const executionGuide = {
     },
     {
       intent: 'agentic job',
-      steps: ['arcox_agent_job operation=plan/read-* first', 'show job/budget/action', 'user yes', 'arcox_agent_job with value-moving operation only after confirmation'],
-      never: ['Do not fund/complete/submit silently.'],
+      steps: ['get_agent_identity or list_agent_identities', 'select_agent_identity when needed', 'create_agent_job without confirmed for preview', 'show agentId/provider/evaluator/action', 'user yes', 'create_agent_job with confirmed=true, previewId, confirmationText', 'list_agent_jobs'],
+      never: ['Do not create/fund/complete/submit without an owned active Agent Identity.', 'Do not execute silently.'],
     },
   ],
   recovery: [
@@ -283,6 +288,38 @@ const tools = [
       properties: { ownerAddress: { type: 'string' } },
       additionalProperties: false,
     },
+  },
+  {
+    name: 'get_agent_identity',
+    description: 'Get the selected Arc ERC-8004 Agent Identity for the local owner, or read a specific agentId.',
+    inputSchema: { type: 'object', properties: { ownerAddress: { type: 'string' }, agentId: { type: 'string' } }, additionalProperties: false },
+  },
+  {
+    name: 'list_agent_identities',
+    description: 'List Arc ERC-8004 Agent Identities owned by the local wallet or ownerAddress.',
+    inputSchema: { type: 'object', properties: { ownerAddress: { type: 'string' }, refresh: { type: 'boolean' } }, additionalProperties: false },
+  },
+  {
+    name: 'select_agent_identity',
+    description: 'Select an owned Arc ERC-8004 identity as the active identity for new API keys and Agent Jobs.',
+    inputSchema: { type: 'object', properties: { agentId: { type: 'string' } }, required: ['agentId'], additionalProperties: false },
+  },
+  {
+    name: 'create_agent_job',
+    description: 'Preview or create an identity-bound ERC-8183 Agent Job with an Arc Transaction Memo. Requires explicit yes/ya after preview.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        provider: { type: 'string' }, evaluator: { type: 'string' }, description: { type: 'string' }, hours: { type: 'number', default: 24 },
+        apiKey: { type: 'string' }, previewId: { type: 'string' }, confirmed: { type: 'boolean' }, confirmationText: { type: 'string', enum: ['yes', 'ya'] },
+      },
+      required: ['description'], additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_agent_jobs',
+    description: 'List identity-bound Agent Job summaries for the ARCOX API key.',
+    inputSchema: { type: 'object', properties: { apiKey: { type: 'string' }, limit: { type: 'number', default: 50 } }, additionalProperties: false },
   },
   {
     name: 'get_unified_balance',
@@ -767,6 +804,9 @@ const tools = [
         amount: { type: 'string' },
         deliverable: { type: 'string' },
         reason: { type: 'string' },
+        previewId: { type: 'string' },
+        confirmed: { type: 'boolean' },
+        confirmationText: { type: 'string', enum: ['yes', 'ya'] },
       },
       required: ['operation'],
       additionalProperties: false,
@@ -940,16 +980,19 @@ async function agentJob(args) {
   if (args.operation === 'plan') return makeAgentResponse({ prompt: args.prompt, jobId: args.jobId, agentId: args.agentId })
   if (args.operation === 'register-agent') return registerAgentIdentity({ metadataUri: args.metadataUri })
   if (args.operation === 'read-agent') return readAgent(args.agentId)
-  if (args.operation === 'create-job') return createAgentJob(args)
+  const active = args.agentId ? await readAgent(args.agentId) : await getAgentIdentity({})
+  if (!active?.agentId) throw new Error('Agent Identity required for Agent Jobs')
+  const bound = { ...args, agentId: active.agentId }
+  if (args.operation === 'create-job') return createAgentJob(bound)
   if (args.operation === 'read-job') return readJob(args.jobId)
-  if (args.operation === 'set-budget') return setAgentJobBudget(args)
-  if (args.operation === 'fund') return fundAgentJob(args)
-  if (args.operation === 'submit') return submitAgentJob(args)
-  if (args.operation === 'complete') return completeAgentJob(args)
+  if (args.operation === 'set-budget') return setAgentJobBudget(bound)
+  if (args.operation === 'fund') return fundAgentJob(bound)
+  if (args.operation === 'submit') return submitAgentJob(bound)
+  if (args.operation === 'complete') return completeAgentJob(bound)
   throw new Error(`Unsupported agent job operation: ${args.operation}`)
 }
 
-const valueMovingTools = new Set(['arcox_execute_bridge', 'arcox_execute_send', 'arcox_execute_swap', 'arcox_pay_payment_request', 'arcox_x402_pay_invoice', 'deposit_unified_balance', 'set_ai_router_auto_pay'])
+const valueMovingTools = new Set(['arcox_execute_bridge', 'arcox_execute_send', 'arcox_execute_swap', 'arcox_pay_payment_request', 'arcox_x402_pay_invoice', 'deposit_unified_balance', 'set_ai_router_auto_pay', 'create_agent_job'])
 const valueMovingJobOps = new Set(['register-agent', 'create-job', 'set-budget', 'fund', 'submit', 'complete'])
 const rateLimitBuckets = new Map()
 const RATE_LIMIT_WINDOW_MS = 60_000
@@ -965,7 +1008,7 @@ let activeValueMovingExecution = null
 
 function isValueMovingCall(name, args) {
   if (valueMovingTools.has(name)) return args.confirmed === true
-  return name === 'arcox_agent_job' && valueMovingJobOps.has(args.operation)
+  return name === 'arcox_agent_job' && valueMovingJobOps.has(args.operation) && args.confirmed === true
 }
 
 function enforceRateLimit(key) {
@@ -1092,6 +1135,31 @@ function canonicalPreviewArgs(name, args) {
   if (action === 'set_ai_router_auto_pay') {
     return { action, enabled: args.enabled === true }
   }
+  if (action === 'create_agent_job') {
+    return {
+      action,
+      provider: String(args.provider || '').toLowerCase(),
+      evaluator: String(args.evaluator || '').toLowerCase(),
+      description: String(args.description || ''),
+      hours: Number(args.hours || 24),
+    }
+  }
+  if (action === 'arcox_agent_job') {
+    return {
+      action,
+      operation: String(args.operation || ''),
+      agentId: String(args.agentId || ''),
+      metadataUri: String(args.metadataUri || ''),
+      jobId: String(args.jobId || ''),
+      provider: String(args.provider || '').toLowerCase(),
+      evaluator: String(args.evaluator || '').toLowerCase(),
+      description: String(args.description || ''),
+      hours: Number(args.hours || 24),
+      amount: canonicalAmount(args.amount),
+      deliverable: String(args.deliverable || ''),
+      reason: String(args.reason || ''),
+    }
+  }
   return { action, ...args }
 }
 
@@ -1152,7 +1220,8 @@ function quoteRiskChecks(name, quote) {
 }
 
 function enforcePreview(name, args) {
-  if (!valueMovingTools.has(name) || args.confirmed !== true) return
+  const guardedLegacyJob = name === 'arcox_agent_job' && valueMovingJobOps.has(args.operation)
+  if ((!valueMovingTools.has(name) && !guardedLegacyJob) || args.confirmed !== true) return
   loadPreviewApprovals()
   const previewId = String(args.previewId || '')
   const preview = previewApprovals.get(previewId)
@@ -1257,7 +1326,7 @@ async function rpcResponse(message) {
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false },
         },
-        serverInfo: { name: 'arcox-mcp', version: '0.1.22' },
+        serverInfo: { name: 'arcox-mcp', version: '0.1.23' },
       },
     }
   }
@@ -1277,6 +1346,15 @@ async function rpcResponse(message) {
     if (name === 'arcox_agent_status') return result(id, await agentStatus())
     if (name === 'arcox_wallet_balances') return result(id, await walletBalances())
     if (name === 'get_ai_router_status') return result(id, await getAiRouterStatus(args))
+    if (name === 'get_agent_identity') return result(id, await getAgentIdentity(args))
+    if (name === 'list_agent_identities') return result(id, await listAgentIdentities(args))
+    if (name === 'select_agent_identity') return result(id, await selectAgentIdentity(args))
+    if (name === 'create_agent_job' && args.confirmed !== true) return result(id, attachPreview(name, args, await createIdentityBoundAgentJob(args)))
+    if (name === 'create_agent_job') {
+      enforcePreview(name, args)
+      return result(id, await runValueMovingTool(name, args, () => createIdentityBoundAgentJob({ ...args, mcpPreviewVerified: true })))
+    }
+    if (name === 'list_agent_jobs') return result(id, await listIdentityBoundAgentJobs(args))
     if (name === 'get_unified_balance') return result(id, await getUnifiedBalance(args))
     if (name === 'quote_unified_balance_deposit') return result(id, attachPreview(name, args, await quoteUnifiedBalanceDeposit(args)))
     if (name === 'deposit_unified_balance' && args.confirmed !== true) return result(id, attachPreview('quote_unified_balance_deposit', args, await quoteUnifiedBalanceDeposit(args)))
@@ -1384,7 +1462,24 @@ async function rpcResponse(message) {
     if (name === 'arcox_intel_get_token') return result(id, await intelGetToken(args))
     if (name === 'arcox_intel_search') return result(id, await intelSearch(args))
     if (name === 'arcox_agent_job') {
-      if (isValueMovingCall(name, args)) enforceSpendLimits(name, args)
+      const valueMovingOperation = valueMovingJobOps.has(args.operation)
+      if (valueMovingOperation && args.confirmed !== true) {
+        return result(id, attachPreview(name, args, {
+          status: 'preview_only',
+          operation: args.operation,
+          agentId: args.agentId || null,
+          jobId: args.jobId || null,
+          provider: args.provider || null,
+          evaluator: args.evaluator || null,
+          amount: args.amount || null,
+          message: 'This Agent Job operation changes on-chain state and requires explicit yes/ya confirmation.',
+        }))
+      }
+      if (valueMovingOperation) {
+        enforcePreview(name, args)
+        enforceSpendLimits(name, args)
+        return result(id, await runValueMovingTool(name, args, () => agentJob(args)))
+      }
       return result(id, await agentJob(args))
     }
     throw new Error(`Unknown tool: ${name}`)

@@ -141,6 +141,16 @@ The agent must not skip the preview step.
 
 ## Tools
 
+Identity and jobs:
+
+- `get_agent_identity`
+- `list_agent_identities`
+- `select_agent_identity`
+- `create_agent_job`
+- `list_agent_jobs`
+
+Agent Jobs require an owned active Arc ERC-8004 identity. `create_agent_job` uses preview and explicit confirmation, then attaches an Arc Transaction Memo to the ERC-8183 call.
+
 - `arcox_wallet_balances`
 - `arcox_transaction_history`
 - `arcox_quote_swap`
