@@ -1208,7 +1208,9 @@ async function runValueMovingTool(name, args, fn) {
   }
   activeValueMovingExecution = name
   try {
-    return await fn()
+    const value = await fn()
+    recordSpend(name, args)
+    return value
   } finally {
     activeValueMovingExecution = null
   }
@@ -1217,6 +1219,8 @@ async function runValueMovingTool(name, args, fn) {
 function enforceSpendLimits(name, args) {
   if (!isValueMovingCall(name, args)) return
   const amount = spendAmountFor(name, args)
+  const amountRequired = new Set(['deposit_unified_balance', 'arcox_execute_bridge', 'arcox_execute_send', 'arcox_execute_swap'])
+  if (amountRequired.has(name) && (!Number.isFinite(amount) || amount <= 0)) throw new Error('Transaction amount must be a finite number greater than zero.')
   if (!Number.isFinite(amount) || amount <= 0) return
   if (name === 'arcox_execute_bridge' && isNativeBridgeToken(args.token)) {
     if (MAX_TX_NATIVE > 0 && amount > MAX_TX_NATIVE) throw new Error(`Native bridge exceeds ARCOX_MAX_TX_NATIVE=${MAX_TX_NATIVE}. Reduce amount or raise local env limit.`)
@@ -1225,9 +1229,20 @@ function enforceSpendLimits(name, args) {
   if (MAX_TX_USDC > 0 && amount > MAX_TX_USDC) throw new Error(`Transaction exceeds ARCOX_MAX_TX_USDC=${MAX_TX_USDC}. Reduce amount or raise local env limit.`)
   const day = new Date().toISOString().slice(0, 10)
   const key = `local-mcp-client:${day}`
+  for (const storedKey of dailySpendBuckets.keys()) {
+    if (!storedKey.endsWith(`:${day}`)) dailySpendBuckets.delete(storedKey)
+  }
   const used = dailySpendBuckets.get(key) || 0
   if (DAILY_LIMIT_USDC > 0 && used + amount > DAILY_LIMIT_USDC) throw new Error(`Daily limit exceeded. Used ${used} USDC, requested ${amount}, limit ${DAILY_LIMIT_USDC}.`)
-  dailySpendBuckets.set(key, used + amount)
+}
+
+function recordSpend(name, args) {
+  const amount = spendAmountFor(name, args)
+  if (!Number.isFinite(amount) || amount <= 0) return
+  if (name === 'arcox_execute_bridge' && isNativeBridgeToken(args.token)) return
+  const day = new Date().toISOString().slice(0, 10)
+  const key = `local-mcp-client:${day}`
+  dailySpendBuckets.set(key, (dailySpendBuckets.get(key) || 0) + amount)
 }
 
 async function rpcResponse(message) {
