@@ -1172,6 +1172,7 @@ export async function quoteAiRouterAutoPay(input = {}) {
     autoPayAddress: delegateAddress,
     source: 'Unified Balance only',
     sourceChains,
+    currentDelegateChains: status?.autoPay?.delegateChains || [],
     requiresWalletTransaction: delegateAddress.toLowerCase() !== account.address.toLowerCase(),
     requiresUserConfirmation: true,
     safeNextStep: `Show this Auto Pay ${enabled ? 'enable' : 'disable'} preview, then execute only after the user replies yes or ya.`,
@@ -1184,21 +1185,29 @@ export async function setAiRouterAutoPay(input = {}) {
   const account = privateKeyToAccount(privateKey())
   const transactions = []
   const delegateChains = []
+  const previousChains = new Map((quote.currentDelegateChains || []).map(item => [item.chain, normalizeDelegateStatus(item.status)]))
+  const token = await backendSession(account)
+  if (!quote.enabled) {
+    await postJson('/api/ai-router/auto-pay', {
+      ownerAddress: account.address,
+      enabled: false,
+      delegateStatus: 'not_configured',
+      delegateAddress: quote.autoPayAddress,
+      delegateChains: quote.currentDelegateChains || [],
+    }, token, 30_000)
+  }
   if (quote.autoPayAddress.toLowerCase() !== account.address.toLowerCase()) {
     for (const chain of quote.sourceChains) {
       try {
-        let status = await unifiedBalanceKit().unifiedBalance.getDelegateStatus({
-          from: { adapter: unifiedBalanceAdapter(), chain },
-          delegateAddress: quote.autoPayAddress,
-        })
+        let status = await resolveAgentDelegateStatus(account.address, quote.autoPayAddress, chain, previousChains.get(chain))
         if (quote.enabled && status === 'none') {
           const result = await unifiedBalanceKit().unifiedBalance.addDelegate({ from: { adapter: unifiedBalanceAdapter(), chain }, delegateAddress: quote.autoPayAddress })
           transactions.push({ chain, txHash: findTransactionHash(result) || null })
-          for (let attempt = 0; attempt < 4; attempt += 1) {
-            status = await unifiedBalanceKit().unifiedBalance.getDelegateStatus({ from: { adapter: unifiedBalanceAdapter(), chain }, delegateAddress: quote.autoPayAddress })
-            if (status === 'ready' || status === 'none') break
-            await sleep(3000)
-          }
+          status = 'pending'
+          try {
+            const refreshed = await gatewayDelegateStatus(account.address, quote.autoPayAddress, chain)
+            if (refreshed === 'ready') status = 'ready'
+          } catch {}
         } else if (!quote.enabled && status !== 'none') {
           const result = await unifiedBalanceKit().unifiedBalance.removeDelegate({ from: { adapter: unifiedBalanceAdapter(), chain }, delegateAddress: quote.autoPayAddress })
           transactions.push({ chain, txHash: findTransactionHash(result) || null })
@@ -1206,18 +1215,19 @@ export async function setAiRouterAutoPay(input = {}) {
         }
         delegateChains.push({ chain, status: normalizeDelegateStatus(status) })
       } catch (error) {
-        delegateChains.push({ chain, status: 'not_configured', error: String(error?.message || error).slice(0, 180) })
+        const previous = previousChains.get(chain)
+        delegateChains.push({ chain, status: previous === 'ready' || previous === 'pending' ? previous : 'not_configured', error: String(error?.message || error).slice(0, 180) })
       }
     }
   } else {
     delegateChains.push(...quote.sourceChains.map(chain => ({ chain, status: quote.enabled ? 'ready' : 'not_configured' })))
   }
   const ready = delegateChains.some(item => item.status === 'ready')
-  const token = await backendSession(account)
+  const pending = delegateChains.some(item => item.status === 'pending')
   const policy = await postJson('/api/ai-router/auto-pay', {
     ownerAddress: account.address,
-    enabled: quote.enabled && ready,
-    delegateStatus: quote.enabled ? ready ? 'ready' : delegateChains.some(item => item.status === 'pending') ? 'pending' : 'not_configured' : 'not_configured',
+    enabled: quote.enabled && (ready || pending),
+    delegateStatus: quote.enabled ? ready ? 'ready' : pending ? 'pending' : 'not_configured' : 'not_configured',
     delegateAddress: quote.autoPayAddress,
     delegateChains,
   }, token, 30_000)
@@ -1231,6 +1241,29 @@ export async function setAiRouterAutoPay(input = {}) {
     delegateChains,
     transactions,
     autoPay: policy.autoPay,
+  }
+}
+
+async function gatewayDelegateStatus(ownerAddress, delegateAddress, chain) {
+  const query = new URLSearchParams({ ownerAddress, delegateAddress, chain })
+  const data = await arcoxApiGetJson(`/api/ai-router/delegate-status?${query}`)
+  return normalizeDelegateStatus(data.status)
+}
+
+async function resolveAgentDelegateStatus(ownerAddress, delegateAddress, chain, previousStatus) {
+  try {
+    return await gatewayDelegateStatus(ownerAddress, delegateAddress, chain)
+  } catch {
+    try {
+      return normalizeDelegateStatus(await unifiedBalanceKit().unifiedBalance.getDelegateStatus({
+        from: { adapter: unifiedBalanceAdapter(), chain },
+        delegateAddress,
+      }))
+    } catch (error) {
+      if (/failed to fetch gateway info/i.test(String(error?.message || error))) return 'pending'
+      if (previousStatus === 'ready' || previousStatus === 'pending') return previousStatus
+      throw error
+    }
   }
 }
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.25
+
+- Resolve Auto Pay readiness through the ARCOX backend to avoid browser Gateway info failures.
+- Preserve pending per-chain setup and turn the backend policy off before delegate revocation.
+
 ## 0.1.24
 
 - Configure AI Router Auto Pay for every funded EVM Unified Balance source chain.
