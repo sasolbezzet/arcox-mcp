@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.26
+
+- Include pending-funded chains when preparing per-chain Auto Pay delegation.
+
 ## 0.1.25
 
 - Resolve Auto Pay readiness through the ARCOX backend to avoid browser Gateway info failures.

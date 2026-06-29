@@ -1271,7 +1271,7 @@ function unifiedBalanceFundedChains(balance) {
   const supported = new Set(['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'])
   return (balance?.breakdown || [])
     .flatMap(source => source?.breakdown || [])
-    .filter(item => supported.has(item?.chain) && Number(item?.confirmedBalance || 0) > 0)
+    .filter(item => supported.has(item?.chain) && (Number(item?.confirmedBalance || 0) > 0 || Number(item?.pendingBalance || 0) > 0))
     .map(item => item.chain)
 }
 
