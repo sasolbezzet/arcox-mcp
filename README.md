@@ -40,11 +40,11 @@ npx arcox-mcp
 
 ## Environment
 
-Use the single protected ARCOX runtime env:
+Keep backend and user signing secrets in separate trust domains:
 
 ```bash
-nano ~/arc-dex-api/.env
 chmod 600 ~/arc-dex-api/.env
+chmod 600 ~/.arcox/agent.env
 ```
 
 Optional safety limits:
@@ -64,7 +64,7 @@ bridge 0.001 ETH from Ethereum Sepolia to Arc
 
 Native bridge uses the local EOA agent wallet only. Circle Wallet source supports USDC bridge routes, not native ETH.
 
-ARCOX reads its single runtime env from `~/arc-dex-api/.env`. Secret values are never printed by the CLI.
+The backend reads `~/arc-dex-api/.env`; the local agent reads `~/.arcox/agent.env`. The backend never receives the user wallet key, and secret values are never printed.
 
 ```bash
 arcox-agent status
@@ -228,7 +228,7 @@ Swap uses EOA by default. To use the Circle proxy wallet, the tool call must exp
 
 ## Security
 
-- Signing secrets exist only in `~/arc-dex-api/.env` with permission `600`.
+- User signing secrets exist only in `~/.arcox/agent.env`; backend/provider secrets remain in `~/arc-dex-api/.env`. Both use permission `600`.
 - ARCOX DEX web UI does not receive the private key.
 - MCP execution is local to the user's agent process.
 - `arcox-agent status` reports `envSecurityWarnings` when the `.env` file is readable by group/other users.

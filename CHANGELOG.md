@@ -85,3 +85,8 @@
 - Load ARCOX runtime settings from one protected API env.
 - Add retry idempotency so identical model requests are not charged twice.
 - Remove private-key placeholders from terminal output and docs.
+# 0.1.30
+
+- Require API Pass owner-wallet and Agent Identity match before every value-moving MCP action.
+- Separate local user signer secrets from backend delegate/provider secrets.
+- Apply owner-only runtime file permissions by default.

@@ -47,6 +47,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const AGENT_HOME = dirname(__dirname)
 const loadedEnvFiles = []
 
+process.umask(0o077)
 loadLocalEnv()
 
 const ARC_RPC = process.env.ARC_RPC || 'https://rpc.testnet.arc.network/'
@@ -568,7 +569,7 @@ Usage:
   npm run agent -- complete --job-id 1 --reason "approved"
 
 Required for onchain commands:
-  Configure signing secrets only in ~/arc-dex-api/.env and set permission 600.
+  Configure local signing secrets only in ~/.arcox/agent.env and set permission 600.
 
 Local endpoint for ARCOX DEX UI:
   npm run agent -- serve --port 8787
@@ -584,7 +585,7 @@ function loadLocalEnv() {
   const envPaths = [
     process.env.ARCOX_AGENT_ENV,
     process.env.ARCOX_SHARED_ENV,
-    join(homedir(), 'arc-dex-api', '.env'),
+    join(homedir(), '.arcox', 'agent.env'),
   ].filter(Boolean)
   for (const envPath of envPaths) {
     if (!existsSync(envPath)) continue
@@ -1485,6 +1486,18 @@ export async function callAiModel(input = {}) {
 export async function getApiKeyStatus(input = {}) {
   const apiKey = aiRouterApiKey(input)
   return aiRouterFetch('/api/ai-router/api-keys/status', { apiKey })
+}
+
+export async function assertTransactionIdentity(input = {}) {
+  const status = await getApiKeyStatus(input)
+  const key = status?.key
+  if (!status?.apiPassActive || key?.status !== 'active') throw new Error('Transaction blocked: API Pass is not active.')
+  if (!key?.agentId) throw new Error('Transaction blocked: API key is not bound to an Agent Identity.')
+  const signer = privateKeyToAccount(privateKey()).address
+  if (signer.toLowerCase() !== String(key.ownerAddress || '').toLowerCase()) {
+    throw new Error('403 wallet_mismatch: local transaction signer does not match the wallet bound to this API key.')
+  }
+  return { ownerWallet: signer, agentId: key.agentId, sbtTokenId: key.sbtTokenId, apiKeyIdHash: key.apiKeyIdHash }
 }
 
 export async function createApiSession(input = {}) {
@@ -4349,7 +4362,7 @@ async function main() {
   const cmd = command()
   if (cmd === 'help') return help()
   if (cmd === 'env-template') {
-    console.log('Configure ARCOX secrets only in ~/arc-dex-api/.env and set its permission to 600. Secret values are never printed by this command.')
+    console.log('Configure local agent secrets only in ~/.arcox/agent.env with permission 600. Backend secrets remain separate. Secret values are never printed.')
     return
   }
   if (cmd === 'identity') {

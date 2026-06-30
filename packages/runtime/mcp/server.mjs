@@ -7,6 +7,7 @@ import { homedir } from 'node:os'
 import { actions, ARCOX_API_URL, ARCOX_WEB_URL, chainSupport, pages, retailRules } from './registry.mjs'
 import {
   agentStatus,
+  assertTransactionIdentity,
   checkPaymentStatus,
   callAiModel,
   createApiSession,
@@ -1295,6 +1296,7 @@ async function runValueMovingTool(name, args, fn) {
   }
   activeValueMovingExecution = name
   try {
+    await assertTransactionIdentity(args)
     const value = await fn()
     recordSpend(name, args)
     return value
@@ -1344,7 +1346,7 @@ async function rpcResponse(message) {
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false },
         },
-        serverInfo: { name: 'arcox-mcp', version: '0.1.29' },
+        serverInfo: { name: 'arcox-mcp', version: '0.1.30' },
       },
     }
   }
