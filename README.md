@@ -40,27 +40,11 @@ npx arcox-mcp
 
 ## Environment
 
-Create a working folder on the user's computer:
+Use the single protected ARCOX runtime env:
 
 ```bash
-mkdir -p ~/.arcox
-nano ~/.arcox/.env
-chmod 600 ~/.arcox/.env
-```
-
-Minimum EVM setup:
-
-```bash
-AGENT_PRIVATE_KEY=0x...
-ARC_RPC=https://rpc.testnet.arc.network/
-ARCOX_API_URL=https://arc-dex-bice.vercel.app
-```
-
-Optional Solana Devnet setup:
-
-```bash
-SOLANA_PRIVATE_KEY=[1,2,3,...]
-SOLANA_DEVNET_RPC=https://api.devnet.solana.com
+nano ~/arc-dex-api/.env
+chmod 600 ~/arc-dex-api/.env
 ```
 
 Optional safety limits:
@@ -80,10 +64,9 @@ bridge 0.001 ETH from Ethereum Sepolia to Arc
 
 Native bridge uses the local EOA agent wallet only. Circle Wallet source supports USDC bridge routes, not native ETH.
 
-When installed globally, run commands from `~/.arcox` so the local `.env` file is loaded:
+ARCOX reads its single runtime env from `~/arc-dex-api/.env`. Secret values are never printed by the CLI.
 
 ```bash
-cd ~/.arcox
 arcox-agent status
 ```
 
@@ -245,14 +228,14 @@ Swap uses EOA by default. To use the Circle proxy wallet, the tool call must exp
 
 ## Security
 
-- Private keys stay on the user's computer in `.env`.
+- Signing secrets exist only in `~/arc-dex-api/.env` with permission `600`.
 - ARCOX DEX web UI does not receive the private key.
 - MCP execution is local to the user's agent process.
 - `arcox-agent status` reports `envSecurityWarnings` when the `.env` file is readable by group/other users.
-- Keep `.env` outside synced folders and never paste private keys into chat.
+- Never paste signing secrets into chat, command arguments, logs, or application configuration.
 # API Pass sessions
 
-New AI Router keys mint a non-transferable ARCOX API Pass on Arc Testnet. The key alone cannot call AI models. Set `ARCOX_SESSION_PRIVATE_KEY` to the API Pass owner or an on-chain authorized session delegate, then run:
+New AI Router keys mint a non-transferable ARCOX API Pass on Arc Testnet. The key alone cannot call AI models. Configure the dedicated session signer only in the central env, then run:
 
 ```bash
 arcox-agent serve --port 8787

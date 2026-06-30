@@ -11,7 +11,7 @@ export const pages = [
     actions: ['quote_swap', 'execute_circle_swap', 'execute_eoa_swap'],
     signing: {
       circle: 'Circle proxy wallet signs through backend wallet infrastructure.',
-      eoa: 'Terminal MCP uses local AGENT_PRIVATE_KEY to sign approve and Circle AppKit adapter execute transactions. Web UI uses user wallet popup.',
+      eoa: 'Terminal MCP uses the configured local signer. Web UI uses the user wallet popup.',
     },
     knownCautions: [
       'Circle swap charges platform fee first, then swaps net input.',
@@ -102,7 +102,7 @@ export const actions = [
     intentExamples: ['swap dari metamask 1 USDC ke EURC'],
     requiredSlots: ['tokenIn', 'tokenOut', 'amountIn', 'confirmedQuote'],
     safeExecution: 'requires_wallet_signature',
-    backend: 'POST /api/eoa-swap-prepare then local AGENT_PRIVATE_KEY signs adapter approve/execute',
+    backend: 'POST /api/eoa-swap-prepare then the configured local signer approves and executes',
   },
   {
     id: 'bridge_usdc',

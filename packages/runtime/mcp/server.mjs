@@ -275,7 +275,7 @@ const tools = [
   },
   {
     name: 'arcox_agent_status',
-    description: 'Return the local ARCOX agent signer address and Arc balances from AGENT_PRIVATE_KEY.',
+    description: 'Return the configured local ARCOX signer address and Arc balances without exposing signing secrets.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -285,7 +285,7 @@ const tools = [
   },
   {
     name: 'get_ai_router_status',
-    description: 'Get ARCOX AI Router status for ownerAddress or the local AGENT_PRIVATE_KEY owner by default.',
+    description: 'Get ARCOX AI Router status for ownerAddress or the configured local signer by default.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' } },
@@ -326,7 +326,7 @@ const tools = [
   },
   {
     name: 'get_unified_balance',
-    description: 'Get live Circle Gateway Unified Balance, pending deposits, chain breakdown, and Auto Pay status. Defaults to local AGENT_PRIVATE_KEY owner.',
+    description: 'Get live Circle Gateway Unified Balance, pending deposits, chain breakdown, and Auto Pay status. Defaults to the configured local signer.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' } },
@@ -335,7 +335,7 @@ const tools = [
   },
   {
     name: 'quote_unified_balance_deposit',
-    description: 'Preview a real testnet USDC deposit from the local AGENT_PRIVATE_KEY wallet into Circle Gateway Unified Balance. Does not transact.',
+    description: 'Preview a real testnet USDC deposit from the configured local signer into Circle Gateway Unified Balance. Does not transact.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -348,7 +348,7 @@ const tools = [
   },
   {
     name: 'deposit_unified_balance',
-    description: 'Execute a confirmed real testnet USDC Unified Balance deposit using local AGENT_PRIVATE_KEY. Requires previewId and explicit yes/ya after quote_unified_balance_deposit.',
+    description: 'Execute a confirmed real testnet USDC Unified Balance deposit with the configured local signer. Requires previewId and explicit yes/ya.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -374,7 +374,7 @@ const tools = [
   },
   {
     name: 'set_ai_router_auto_pay',
-    description: 'Enable or disable AI Router Auto Pay after an explicit preview confirmation. Uses local AGENT_PRIVATE_KEY to update the Unified Balance delegate and authenticated backend policy.',
+    description: 'Enable or disable AI Router Auto Pay after explicit confirmation using the configured local signer.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -413,7 +413,7 @@ const tools = [
   },
   {
     name: 'delete_ai_api_key',
-    description: 'Delete/revoke an ARCOX AI Router API key owned by the local AGENT_PRIVATE_KEY wallet.',
+    description: 'Delete/revoke an ARCOX AI Router API key owned by the configured local signer.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' }, keyId: { type: 'string' } },
@@ -442,7 +442,7 @@ const tools = [
   },
   {
     name: 'get_usage_logs',
-    description: 'Get ARCOX AI Router usage logs. Defaults to local AGENT_PRIVATE_KEY owner.',
+    description: 'Get ARCOX AI Router usage logs. Defaults to the configured local signer.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' }, limit: { type: 'number', default: 10 } },
@@ -467,7 +467,7 @@ const tools = [
   },
   {
     name: 'arcox_execute_bridge',
-    description: 'Execute a confirmed bridge with the local AGENT_PRIVATE_KEY signer. Requires previewId from arcox_quote_bridge when confirmed=true. Supports USDC CCTP routes and native ETH from Ethereum/Base Sepolia to Arc via native swap bridge router. Native bridge must use source="eoa".',
+    description: 'Execute a confirmed bridge with the configured local signer. Requires previewId and explicit confirmation.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -501,7 +501,7 @@ const tools = [
   },
   {
     name: 'arcox_execute_send',
-    description: 'Execute a confirmed Arc token send with the local AGENT_PRIVATE_KEY signer. Requires previewId from arcox_quote_send when confirmed=true.',
+    description: 'Execute a confirmed Arc token send with the configured local signer. Requires previewId and explicit confirmation.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -561,7 +561,7 @@ const tools = [
   },
   {
     name: 'arcox_pay_payment_request',
-    description: 'Pay a quoted ARCOX Pay invoice with the local AGENT_PRIVATE_KEY signer. Requires previewId from arcox_quote_payment_request and explicit user confirmation.',
+    description: 'Pay a quoted ARCOX Pay invoice with the configured local signer. Requires previewId and explicit confirmation.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -788,7 +788,7 @@ const tools = [
   },
   {
     name: 'arcox_execute_swap',
-    description: 'Execute a confirmed Arc swap. Default source is EOA agent wallet signed by local AGENT_PRIVATE_KEY. Set source="circle" only when explicitly quoted for Circle proxy wallet. Requires previewId from arcox_quote_swap when confirmed=true.',
+    description: 'Execute a confirmed Arc swap with the configured local signer. Set source="circle" only when explicitly quoted. Requires previewId and confirmation.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1344,7 +1344,7 @@ async function rpcResponse(message) {
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false },
         },
-        serverInfo: { name: 'arcox-mcp', version: '0.1.28' },
+        serverInfo: { name: 'arcox-mcp', version: '0.1.29' },
       },
     }
   }

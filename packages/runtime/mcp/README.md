@@ -65,7 +65,7 @@ Execution safety:
 
 - Value-moving tools must be called first as quote/preview.
 - Execute tools only submit transactions when `confirmed: true`, a valid `previewId` is supplied, and the user confirmation text is exactly `yes` or `ya`.
-- EOA execution uses the local `AGENT_PRIVATE_KEY` in `arcox-agent/.env`.
+- EOA execution uses the configured local signer from the protected central env; secret values are never returned.
 - Circle proxy wallet actions use the ARCOX backend auth session signed by the local agent key and must be explicitly requested with `source="circle"`.
 - ARCOX Intel x402 uses internal invoices and Arc transaction memos for payment reconciliation. MCP pays after preview/confirmation, polls status, and never asks users to submit a txHash manually.
 - Browser-wallet signing from the Web UI remains separate from terminal/MCP execution.

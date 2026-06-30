@@ -568,7 +568,7 @@ Usage:
   npm run agent -- complete --job-id 1 --reason "approved"
 
 Required for onchain commands:
-  Copy .env.example to .env and set AGENT_PRIVATE_KEY=0x...
+  Configure signing secrets only in ~/arc-dex-api/.env and set permission 600.
 
 Local endpoint for ARCOX DEX UI:
   npm run agent -- serve --port 8787
@@ -583,9 +583,8 @@ Safety:
 function loadLocalEnv() {
   const envPaths = [
     process.env.ARCOX_AGENT_ENV,
-    join(process.cwd(), '.env'),
-    join(homedir(), '.arcox', '.env'),
-    join(AGENT_HOME, '.env'),
+    process.env.ARCOX_SHARED_ENV,
+    join(homedir(), 'arc-dex-api', '.env'),
   ].filter(Boolean)
   for (const envPath of envPaths) {
     if (!existsSync(envPath)) continue
@@ -784,8 +783,8 @@ function scheduleAutoMint({ burnTx, fromInfo, toInfo, owner }) {
 }
 
 function privateKey() {
-  const key = process.env.AGENT_PRIVATE_KEY || ''
-  if (!/^0x[0-9a-fA-F]{64}$/.test(key)) throw new Error('Set AGENT_PRIVATE_KEY=0x... for onchain agent commands.')
+  const key = process.env.AGENT_PRIVATE_KEY || process.env.EOA_PRIVATE_KEY || ''
+  if (!/^0x[0-9a-fA-F]{64}$/.test(key)) throw new Error('The centralized ARCOX EVM signer is not configured.')
   return key
 }
 
@@ -797,7 +796,7 @@ function wallet() {
 
 function solanaKeypair() {
   const raw = process.env.SOLANA_PRIVATE_KEY || ''
-  if (!raw) throw new Error('Set SOLANA_PRIVATE_KEY in arcox-agent/.env for Solana bridge execution.')
+  if (!raw) throw new Error('The centralized ARCOX Solana signer is not configured.')
   try {
     const bytes = raw.trim().startsWith('[')
       ? Uint8Array.from(JSON.parse(raw))
@@ -1127,7 +1126,7 @@ export async function quoteUnifiedBalanceDeposit(input = {}) {
     sourceChain: chain,
     token: 'USDC',
     amount,
-    signer: 'local AGENT_PRIVATE_KEY',
+    signer: 'configured local EVM signer',
     route: `${chain} USDC -> Circle Gateway Unified Balance`,
     requiresUserConfirmation: true,
     safeNextStep: 'Show this deposit preview, then execute only after the user replies yes or ya.',
@@ -1292,7 +1291,7 @@ function normalizeDelegateStatus(value) {
 export async function createAiApiKey(input = {}) {
   const ownerAddress = agentOwnerAddress(input)
   const account = privateKeyToAccount(privateKey())
-  if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match local AGENT_PRIVATE_KEY signer.')
+  if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match the configured local EVM signer.')
   const token = await backendSession(account)
   const prepared = await postJson('/api/ai-router/api-keys', { ownerAddress, label: input.label || 'ARCOX MCP AI Router' }, token)
   const { walletClient } = wallet()
@@ -1378,7 +1377,7 @@ export async function deleteAiApiKey(input = {}) {
   const keyId = String(input.keyId || input.id || '').trim()
   if (!keyId) throw new Error('keyId is required.')
   const account = privateKeyToAccount(privateKey())
-  if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match local AGENT_PRIVATE_KEY signer.')
+  if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match the configured local EVM signer.')
   const token = await backendSession(account)
   const status = await getAiRouterStatus({ ownerAddress })
   const key = (status.apiKeys || []).find(item => item.id === keyId)
@@ -2860,7 +2859,7 @@ async function executeEoaPreparedSwap({ owner, tokenIn, tokenOut, apiTokenIn, ap
     },
     note: platformFeeError
       ? `EOA swap executed through Circle Stablecoin Service adapter, but platform fee transfer failed: ${platformFeeError}`
-      : 'EOA swap executed through Circle Stablecoin Service adapter with local AGENT_PRIVATE_KEY signer.',
+      : 'EOA swap executed through Circle Stablecoin Service with the configured local signer.',
   }
 }
 
@@ -2906,7 +2905,7 @@ async function runPrompt() {
     intent,
     approval_required: true,
     approval_mode: 'MCP quote + previewId + explicit user confirmation',
-    note: 'Private key stays in the local .env file. ARCOX DEX only receives status/metadata if you choose to report it.',
+    note: 'Signing secrets are never returned in command output. ARCOX DEX receives only transaction status and metadata.',
   }
   if (!hasFlag('yes')) {
     console.log(JSON.stringify({ ...preview, status: 'preview_only', next: 'Review this plan. Re-run with --yes to execute supported onchain actions.' }, null, 2))
@@ -3376,7 +3375,7 @@ export async function quoteSwap(intent) {
     action: 'swap',
     source: source === 'circle' ? 'circle-wallet-proxy' : 'eoa-agent-wallet',
     terminalExecution: source === 'eoa'
-      ? 'Local AGENT_PRIVATE_KEY signs approve and Circle AppKit adapter execute transactions.'
+      ? 'The configured local signer approves and executes the Circle AppKit transaction.'
       : 'ARCOX backend executes from the Circle proxy wallet after local login signature.',
     owner: account.address,
     tokenIn,
@@ -4308,7 +4307,7 @@ async function serve() {
   })
   server.listen(port, '127.0.0.1', () => {
     console.log(`ARCOX Terminal AI Agent listening on http://127.0.0.1:${port}/agent`)
-    console.log(`Owner: ${owner || 'not set. Set AGENT_PRIVATE_KEY for onchain actions.'}`)
+    console.log(`Owner: ${owner || 'local EVM signer not configured'}`)
   })
 }
 
@@ -4322,7 +4321,10 @@ async function proxyAiRouterRequest(req, res, body) {
   const session = await createApiSession({ apiKey, purpose: req.method === 'GET' ? 'models' : 'chat' })
   const upstream = await fetch(`${ARCOX_API_BASE_URL}${req.url}`, {
     method: req.method,
-    headers: { Authorization: `Bearer ${session.sessionToken}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    headers: {
+      Authorization: `Bearer ${session.sessionToken}`,
+      ...(body ? { 'Content-Type': 'application/json', 'X-ARCOX-IDEMPOTENCY-KEY': createHash('sha256').update(body).digest('hex') } : {}),
+    },
     ...(body ? { body } : {}),
     signal: AbortSignal.timeout(120_000),
   })
@@ -4347,18 +4349,7 @@ async function main() {
   const cmd = command()
   if (cmd === 'help') return help()
   if (cmd === 'env-template') {
-    console.log(`# ARCOX local agent env. Keep this file on the user's computer only.
-AGENT_PRIVATE_KEY=0xYOUR_LOCAL_AGENT_PRIVATE_KEY
-AGENT_NAME=ARCOX Codex Retail Agent
-AGENT_PORT=8787
-ARC_RPC=https://rpc.testnet.arc.network/
-ARCOX_API_URL=https://arc-dex-bice.vercel.app
-ARCOX_WEB_URL=https://arc-dex-bice.vercel.app
-ARCOX_BACKEND_URL=https://43.163.98.128.nip.io
-
-# Optional: set after onchain register returns an Arc ERC-8004 token id.
-ARC_AGENT_ID=
-`)
+    console.log('Configure ARCOX secrets only in ~/arc-dex-api/.env and set its permission to 600. Secret values are never printed by this command.')
     return
   }
   if (cmd === 'identity') {

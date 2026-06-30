@@ -3,7 +3,7 @@
   "name": "ARCOX Codex Retail Agent",
   "agent_type": "retail_payment_agent",
   "description": "Local-first ARCOX agent for retail swap planning, bridge planning, Arc token send, and ERC-8183 job workflows.",
-  "env_file": "./.env",
+  "env_file": "~/arc-dex-api/.env",
   "endpoint": "http://127.0.0.1:8787/agent",
   "capabilities": [
     "send_usdc_on_arc",

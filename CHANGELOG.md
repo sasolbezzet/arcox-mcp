@@ -80,3 +80,8 @@
 
 - Keep the local proxy alive when session creation fails.
 - Allow authenticated model discovery without a Gateway balance estimate.
+# 0.1.29
+
+- Load ARCOX runtime settings from one protected API env.
+- Add retry idempotency so identical model requests are not charged twice.
+- Remove private-key placeholders from terminal output and docs.
