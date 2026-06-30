@@ -1496,7 +1496,7 @@ export async function createApiSession(input = {}) {
   const challenge = await aiRouterFetch('/api/ai-router/sessions/challenge', { apiKey, method: 'POST', body: {} })
   const account = privateKeyToAccount(sessionPrivateKey())
   const signature = await account.signMessage({ message: challenge.message })
-  const session = await aiRouterFetch('/api/ai-router/sessions', { apiKey, method: 'POST', body: { challengeId: challenge.challengeId, signature } })
+  const session = await aiRouterFetch('/api/ai-router/sessions', { apiKey, method: 'POST', body: { challengeId: challenge.challengeId, signature, purpose: input.purpose || 'chat' } })
   aiSessionCache.set(cacheKey, session)
   return session
 }
@@ -4272,11 +4272,16 @@ async function serve() {
       }
     }
     if (req.method === 'GET' && req.url === '/v1/models') {
-      return proxyAiRouterRequest(req, res, null)
+      try {
+        return await proxyAiRouterRequest(req, res, null)
+      } catch (error) {
+        res.writeHead(error?.status || 502, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ error: { message: error.message, type: 'proxy_error' } }))
+      }
     }
     if (req.method === 'POST' && req.url === '/v1/chat/completions') {
       try {
-        return proxyAiRouterRequest(req, res, await readRequestBody(req))
+        return await proxyAiRouterRequest(req, res, await readRequestBody(req))
       } catch (error) {
         res.writeHead(400, { 'Content-Type': 'application/json' })
         return res.end(JSON.stringify({ error: { message: error.message, type: 'proxy_error' } }))
@@ -4314,7 +4319,7 @@ async function proxyAiRouterRequest(req, res, body) {
   if (!configuredKey.startsWith('arx_sk_')) throw new Error('Set ARCOX_AI_ROUTER_API_KEY in the local MCP env.')
   if (suppliedKey && suppliedKey !== configuredKey) throw new Error('The supplied API key does not match this local proxy profile.')
   const apiKey = configuredKey
-  const session = await createApiSession({ apiKey })
+  const session = await createApiSession({ apiKey, purpose: req.method === 'GET' ? 'models' : 'chat' })
   const upstream = await fetch(`${ARCOX_API_BASE_URL}${req.url}`, {
     method: req.method,
     headers: { Authorization: `Bearer ${session.sessionToken}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },

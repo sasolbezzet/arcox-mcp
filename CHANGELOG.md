@@ -76,3 +76,7 @@
 - Bind new AI Router keys to an Arc Testnet API Pass SBT.
 - Add signed short-lived API sessions and local OpenAI-compatible proxy support.
 - Add MCP tools for session creation, refresh, and API key status.
+# 0.1.28
+
+- Keep the local proxy alive when session creation fails.
+- Allow authenticated model discovery without a Gateway balance estimate.
