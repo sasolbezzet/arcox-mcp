@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.32
+
+- Reload protected local API/session credentials when the agent env changes.
+
 ## 0.1.31
 
 - Retry API sessions with the API Pass owner signer when a dedicated session signer is not authorized.

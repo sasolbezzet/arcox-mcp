@@ -1527,9 +1527,26 @@ export async function refreshApiSession(input = {}) {
 }
 
 function aiRouterApiKey(input = {}) {
+  refreshAgentCredentials()
   const key = String(input.apiKey || process.env.ARCOX_AI_ROUTER_API_KEY || '').trim()
   if (!key.startsWith('arx_sk_')) throw new Error('Set ARCOX_AI_ROUTER_API_KEY=arx_sk_... in the local MCP env.')
   return key
+}
+
+function refreshAgentCredentials() {
+  const envPath = process.env.ARCOX_AGENT_ENV || join(homedir(), '.arcox', 'agent.env')
+  if (!existsSync(envPath)) return
+  try {
+    const mode = statSync(envPath).mode & 0o777
+    if ((mode & 0o077) !== 0) return
+    const allowed = new Set(['ARCOX_AI_ROUTER_API_KEY', 'ARCOX_SESSION_PRIVATE_KEY', 'EOA_PRIVATE_KEY', 'AGENT_PRIVATE_KEY'])
+    for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
+      const [key, ...rest] = trimmed.split('=')
+      if (allowed.has(key)) process.env[key] = rest.join('=').replace(/^['"]|['"]$/g, '')
+    }
+  } catch {}
 }
 
 function sessionPrivateKeys(ownerAddress = '') {
@@ -4344,6 +4361,7 @@ async function serve() {
 }
 
 async function proxyAiRouterRequest(req, res, body) {
+  refreshAgentCredentials()
   const header = String(req.headers.authorization || '')
   const configuredKey = String(process.env.ARCOX_AI_ROUTER_API_KEY || '').trim()
   const suppliedKey = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
