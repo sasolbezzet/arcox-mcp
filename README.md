@@ -250,3 +250,12 @@ Swap uses EOA by default. To use the Circle proxy wallet, the tool call must exp
 - MCP execution is local to the user's agent process.
 - `arcox-agent status` reports `envSecurityWarnings` when the `.env` file is readable by group/other users.
 - Keep `.env` outside synced folders and never paste private keys into chat.
+# API Pass sessions
+
+New AI Router keys mint a non-transferable ARCOX API Pass on Arc Testnet. The key alone cannot call AI models. Set `ARCOX_SESSION_PRIVATE_KEY` to the API Pass owner or an on-chain authorized session delegate, then run:
+
+```bash
+arcox-agent serve --port 8787
+```
+
+Use `http://127.0.0.1:8787/v1` as the OpenAI-compatible base URL. The local proxy signs a short-lived challenge and never sends the private key to ARCOX.

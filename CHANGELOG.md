@@ -71,3 +71,8 @@
 ## 0.1.0
 
 - Initial public ARCOX MCP package for wallet balances, swap, bridge, send, history, retry bridge, route status, UI map, and agentic job tools.
+# 0.1.27
+
+- Bind new AI Router keys to an Arc Testnet API Pass SBT.
+- Add signed short-lived API sessions and local OpenAI-compatible proxy support.
+- Add MCP tools for session creation, refresh, and API key status.
