@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.31
+
+- Retry API sessions with the API Pass owner signer when a dedicated session signer is not authorized.
+- Preserve upstream authentication status codes through the local OpenAI-compatible proxy.
+
 ## 0.1.26
 
 - Include pending-funded chains when preparing per-chain Auto Pay delegation.

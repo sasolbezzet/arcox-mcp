@@ -1346,7 +1346,7 @@ async function rpcResponse(message) {
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false },
         },
-        serverInfo: { name: 'arcox-mcp', version: '0.1.30' },
+        serverInfo: { name: 'arcox-mcp', version: '0.1.31' },
       },
     }
   }

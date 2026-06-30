@@ -1506,11 +1506,20 @@ export async function createApiSession(input = {}) {
   const cached = aiSessionCache.get(cacheKey)
   if (!input.force && cached && Date.now() < Date.parse(cached.expiresAt) - 30_000) return cached
   const challenge = await aiRouterFetch('/api/ai-router/sessions/challenge', { apiKey, method: 'POST', body: {} })
-  const account = privateKeyToAccount(sessionPrivateKey())
-  const signature = await account.signMessage({ message: challenge.message })
-  const session = await aiRouterFetch('/api/ai-router/sessions', { apiKey, method: 'POST', body: { challengeId: challenge.challengeId, signature, purpose: input.purpose || 'chat' } })
-  aiSessionCache.set(cacheKey, session)
-  return session
+  let lastError
+  for (const key of sessionPrivateKeys(challenge.ownerAddress)) {
+    try {
+      const account = privateKeyToAccount(key)
+      const signature = await account.signMessage({ message: challenge.message })
+      const session = await aiRouterFetch('/api/ai-router/sessions', { apiKey, method: 'POST', body: { challengeId: challenge.challengeId, signature, purpose: input.purpose || 'chat' } })
+      aiSessionCache.set(cacheKey, session)
+      return session
+    } catch (error) {
+      lastError = error
+      if (error?.status !== 403 || !/different wallet|wallet_mismatch/i.test(error?.message || '')) throw error
+    }
+  }
+  throw lastError || new Error('No authorized ARCOX session signer is configured.')
 }
 
 export async function refreshApiSession(input = {}) {
@@ -1523,10 +1532,15 @@ function aiRouterApiKey(input = {}) {
   return key
 }
 
-function sessionPrivateKey() {
-  const key = process.env.ARCOX_SESSION_PRIVATE_KEY || ''
-  if (!/^0x[0-9a-fA-F]{64}$/.test(key)) throw new Error('Set a dedicated ARCOX_SESSION_PRIVATE_KEY in the local MCP env. Do not reuse the main wallet key.')
-  return key
+function sessionPrivateKeys(ownerAddress = '') {
+  const keys = [process.env.ARCOX_SESSION_PRIVATE_KEY || '']
+  try {
+    const ownerKey = privateKey()
+    if (privateKeyToAccount(ownerKey).address.toLowerCase() === String(ownerAddress).toLowerCase()) keys.push(ownerKey)
+  } catch {}
+  const valid = [...new Set(keys.filter(key => /^0x[0-9a-fA-F]{64}$/.test(key)))]
+  if (!valid.length) throw new Error('Configure ARCOX_SESSION_PRIVATE_KEY or the API Pass owner wallet key in the protected local agent env.')
+  return valid
 }
 
 function hashApiCredential(value) {
@@ -1541,7 +1555,12 @@ async function aiRouterFetch(path, { apiKey, method = 'GET', body } = {}) {
     signal: AbortSignal.timeout(30_000),
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok || data.error) throw new Error(data?.error?.message || data.error || `HTTP ${response.status}`)
+  if (!response.ok || data.error) {
+    const error = new Error(data?.error?.message || data.error || `HTTP ${response.status}`)
+    error.status = response.status
+    error.type = data?.error?.type || ''
+    throw error
+  }
   return data
 }
 
@@ -4295,7 +4314,7 @@ async function serve() {
       try {
         return await proxyAiRouterRequest(req, res, await readRequestBody(req))
       } catch (error) {
-        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.writeHead(error?.status || 502, { 'Content-Type': 'application/json' })
         return res.end(JSON.stringify({ error: { message: error.message, type: 'proxy_error' } }))
       }
     }
