@@ -1,7 +1,7 @@
 {
   "name": "arcox-mcp",
   "private": false,
-  "version": "0.1.32",
+  "version": "0.1.33",
   "type": "module",
   "description": "ARCOX DEX MCP server and terminal agent for retail swap, bridge, send, ARCOX Pay invoices, balances, history, retry bridge, and agentic jobs.",
   "license": "MIT",

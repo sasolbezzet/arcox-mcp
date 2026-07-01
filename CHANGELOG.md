@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.33
+
+- Repair API Pass creation after session signer fallback was introduced.
+
 ## 0.1.32
 
 - Reload protected local API/session credentials when the agent env changes.

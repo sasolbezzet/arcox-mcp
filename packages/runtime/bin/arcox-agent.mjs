@@ -1309,7 +1309,7 @@ export async function createAiApiKey(input = {}) {
     try { return decodeEventLog({ abi: API_PASS_ABI, data: log.data, topics: log.topics }) } catch { return null }
   }).find(item => item?.eventName === 'ApiPassMinted')
   if (!event?.args?.tokenId) throw new Error('API Pass mint event was not found.')
-  const sessionSigner = privateKeyToAccount(sessionPrivateKey()).address
+  const sessionSigner = privateKeyToAccount(sessionPrivateKeys(account.address)[0]).address
   let sessionDelegateTxHash = ''
   if (sessionSigner.toLowerCase() !== account.address.toLowerCase()) {
     sessionDelegateTxHash = await walletClient.writeContract({
