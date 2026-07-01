@@ -4365,9 +4365,8 @@ async function proxyAiRouterRequest(req, res, body) {
   const header = String(req.headers.authorization || '')
   const configuredKey = String(process.env.ARCOX_AI_ROUTER_API_KEY || '').trim()
   const suppliedKey = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
-  if (!configuredKey.startsWith('arx_sk_')) throw new Error('Set ARCOX_AI_ROUTER_API_KEY in the local MCP env.')
-  if (suppliedKey && suppliedKey !== configuredKey && suppliedKey !== 'arcox-local') throw new Error('The supplied API key does not match this local proxy profile.')
-  const apiKey = configuredKey
+  const apiKey = suppliedKey.startsWith('arx_sk_') ? suppliedKey : configuredKey
+  if (!apiKey.startsWith('arx_sk_')) throw new Error('Configure the ARCOX API key in Hermes or ARCOX_AI_ROUTER_API_KEY in the local proxy env.')
   const session = await createApiSession({ apiKey, purpose: req.method === 'GET' ? 'models' : 'chat' })
   const upstream = await fetch(`${ARCOX_API_BASE_URL}${req.url}`, {
     method: req.method,

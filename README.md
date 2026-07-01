@@ -175,16 +175,19 @@ ARCOX AI Router:
 - Auto Pay setup covers each funded EVM source chain; delegated AI spends use only chains whose authorization is ready.
 - API keys use `arx_sk_...`; backend stores only hashes.
 - MCP can create a key with the local `AGENT_PRIVATE_KEY` owner session.
-- MCP can call models with `ARCOX_AI_ROUTER_API_KEY`; each request is paid from user Unified Balance through backend delegated spend.
+- The local proxy accepts the `arx_sk_...` key configured in Hermes; `ARCOX_AI_ROUTER_API_KEY` remains an optional fallback.
+- Each request is paid from user Unified Balance through backend delegated spend.
 - Provider API keys are never stored in MCP; MCP only calls ARCOX API.
 
 OpenAI-compatible config:
 
 ```text
-base_url = https://arc-dex-bice.vercel.app/v1
+base_url = http://127.0.0.1:8787/v1
 api_key = arx_sk_...
 model = arcox/auto
 ```
+
+The local proxy creates the signed session and forwards requests to `https://arc-dex-bice.vercel.app`. Direct use of the production `/v1` endpoint with a bearer API key is intentionally rejected.
 
 ARCOX Intel x402 service coverage:
 

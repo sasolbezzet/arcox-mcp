@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.35
+
+- Accept the Hermes API key through the local signed-session proxy without requiring a duplicate API key env entry.
+
 ## 0.1.34
 
 - Accept the non-secret `arcox-local` credential only on the localhost AI proxy so Hermes does not need the real API key in its config.
