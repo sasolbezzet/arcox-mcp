@@ -79,13 +79,6 @@ const SWAP_EXECUTION_TIMEOUT_MS = Number(process.env.SWAP_EXECUTION_TIMEOUT_MS |
 const SEND_EXECUTION_TIMEOUT_MS = Number(process.env.SEND_EXECUTION_TIMEOUT_MS || '60000')
 const SEND_ESTIMATE_TIMEOUT_MS = Number(process.env.SEND_ESTIMATE_TIMEOUT_MS || '15000')
 const RPC_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || '8000')
-const API_PASS_ABI = [
-  { type: 'function', name: 'mintApiPass', stateMutability: 'nonpayable', inputs: [{ name: 'owner', type: 'address' }, { name: 'apiKeyIdHash', type: 'bytes32' }, { name: 'metadataURI', type: 'string' }], outputs: [{ name: 'tokenId', type: 'uint256' }] },
-  { type: 'function', name: 'burnApiPass', stateMutability: 'nonpayable', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [] },
-  { type: 'function', name: 'setSessionDelegate', stateMutability: 'nonpayable', inputs: [{ name: 'tokenId', type: 'uint256' }, { name: 'delegate', type: 'address' }, { name: 'allowed', type: 'bool' }], outputs: [] },
-  { type: 'event', name: 'ApiPassMinted', inputs: [{ name: 'owner', type: 'address', indexed: true }, { name: 'tokenId', type: 'uint256', indexed: true }, { name: 'apiKeyIdHash', type: 'bytes32', indexed: true }] },
-]
-const aiSessionCache = new Map()
 const SOLANA_CONFIRM_TIMEOUT_MS = Number(process.env.SOLANA_CONFIRM_TIMEOUT_MS || '45000')
 const PLATFORM_FEE_BPS = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
 const ARC_APPKIT_ADAPTER = '0xBBD70b01a1CAbc96d5b7b129Ae1AAabdf50dd40b'
@@ -1294,39 +1287,7 @@ export async function createAiApiKey(input = {}) {
   const account = privateKeyToAccount(privateKey())
   if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match the configured local EVM signer.')
   const token = await backendSession(account)
-  const prepared = await postJson('/api/ai-router/api-keys', { ownerAddress, label: input.label || 'ARCOX MCP AI Router' }, token)
-  const { walletClient } = wallet()
-  const publicClient = clientFor(cctpChains.Arc_Testnet)
-  const mintTxHash = await walletClient.writeContract({
-    address: getAddress(prepared.apiPassAddress),
-    abi: API_PASS_ABI,
-    functionName: 'mintApiPass',
-    args: [account.address, prepared.key.apiKeyIdHash, ''],
-  })
-  const receipt = await publicClient.waitForTransactionReceipt({ hash: mintTxHash })
-  if (receipt.status !== 'success') throw new Error('API Pass mint transaction reverted.')
-  const event = receipt.logs.map(log => {
-    try { return decodeEventLog({ abi: API_PASS_ABI, data: log.data, topics: log.topics }) } catch { return null }
-  }).find(item => item?.eventName === 'ApiPassMinted')
-  if (!event?.args?.tokenId) throw new Error('API Pass mint event was not found.')
-  const sessionSigner = privateKeyToAccount(sessionPrivateKeys(account.address)[0]).address
-  let sessionDelegateTxHash = ''
-  if (sessionSigner.toLowerCase() !== account.address.toLowerCase()) {
-    sessionDelegateTxHash = await walletClient.writeContract({
-      address: getAddress(prepared.apiPassAddress),
-      abi: API_PASS_ABI,
-      functionName: 'setSessionDelegate',
-      args: [event.args.tokenId, sessionSigner, true],
-    })
-    const delegateReceipt = await publicClient.waitForTransactionReceipt({ hash: sessionDelegateTxHash })
-    if (delegateReceipt.status !== 'success') throw new Error('Session signer authorization reverted.')
-  }
-  const activated = await postJson(`/api/ai-router/api-keys/${encodeURIComponent(prepared.key.id)}/activate`, {
-    ownerAddress,
-    sbtTokenId: String(event.args.tokenId),
-    mintTxHash,
-  }, token, 30_000)
-  return { ...activated, sessionSigner, sessionDelegateTxHash }
+  return postJson('/api/ai-router/api-keys', { ownerAddress, label: input.label || 'ARCOX MCP AI Router' }, token)
 }
 
 export async function createIdentityBoundAgentJob(input = {}) {
@@ -1349,10 +1310,9 @@ export async function createIdentityBoundAgentJob(input = {}) {
   const result = await createAgentJob({ ...input, agentId: identity.agentId, provider: input.provider || account.address, evaluator: input.evaluator || account.address })
   const apiKey = String(input.apiKey || process.env.ARCOX_AI_ROUTER_API_KEY || '').trim()
   if (apiKey.startsWith('arx_sk_')) {
-    const session = await createApiSession({ apiKey })
     await fetch(`${ARCOX_API_BASE_URL}/api/ai-router/agent-jobs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.sessionToken}`, 'X-ARCOX-AGENT-ID': identity.agentId },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}`, 'X-ARCOX-AGENT-ID': identity.agentId },
       body: JSON.stringify({ agentId: identity.agentId, jobId: result.jobId, txHash: result.tx, memoId: result.memoId, status: 'created' }),
       signal: AbortSignal.timeout(BACKEND_FETCH_TIMEOUT_MS),
     }).catch(() => null)
@@ -1363,9 +1323,8 @@ export async function createIdentityBoundAgentJob(input = {}) {
 export async function listIdentityBoundAgentJobs(input = {}) {
   const apiKey = String(input.apiKey || process.env.ARCOX_AI_ROUTER_API_KEY || '').trim()
   if (!apiKey.startsWith('arx_sk_')) throw new Error('ARCOX_AI_ROUTER_API_KEY is required to list identity-bound jobs.')
-  const session = await createApiSession({ apiKey })
   const response = await fetch(`${ARCOX_API_BASE_URL}/api/ai-router/agent-jobs?limit=${encodeURIComponent(String(input.limit || 50))}`, {
-    headers: { Accept: 'application/json', Authorization: `Bearer ${session.sessionToken}` },
+    headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}` },
     signal: AbortSignal.timeout(BACKEND_FETCH_TIMEOUT_MS),
   })
   const data = await response.json().catch(() => ({}))
@@ -1380,18 +1339,7 @@ export async function deleteAiApiKey(input = {}) {
   const account = privateKeyToAccount(privateKey())
   if (account.address.toLowerCase() !== ownerAddress.toLowerCase()) throw new Error('ownerAddress must match the configured local EVM signer.')
   const token = await backendSession(account)
-  const status = await getAiRouterStatus({ ownerAddress })
-  const key = (status.apiKeys || []).find(item => item.id === keyId)
-  if (!key) throw new Error('API key not found.')
-  if (key.status !== 'disabled_pending_burn') await postJson(`/api/ai-router/api-keys/${encodeURIComponent(keyId)}/disable`, { ownerAddress }, token)
-  let burnTxHash = ''
-  if (key.sbtTokenId && key.apiPassAddress) {
-    const { walletClient } = wallet()
-    burnTxHash = await walletClient.writeContract({ address: getAddress(key.apiPassAddress), abi: API_PASS_ABI, functionName: 'burnApiPass', args: [BigInt(key.sbtTokenId)] })
-    const receipt = await clientFor(cctpChains.Arc_Testnet).waitForTransactionReceipt({ hash: burnTxHash })
-    if (receipt.status !== 'success') throw new Error('API Pass burn transaction reverted. API key remains disabled.')
-  }
-  return postJson(`/api/ai-router/api-keys/${encodeURIComponent(keyId)}/finalize-revoke`, { ownerAddress, burnTxHash }, token, 30_000)
+  return postJson(`/api/ai-router/api-keys/${encodeURIComponent(keyId)}/revoke`, { ownerAddress }, token, 30_000)
 }
 
 function unifiedBalanceKit() {
@@ -1456,10 +1404,9 @@ export async function callAiModel(input = {}) {
   const prompt = String(input.prompt || '').trim()
   const messages = Array.isArray(input.messages) ? input.messages : [{ role: 'user', content: prompt }]
   if (!messages.length || !messages[0]?.content) throw new Error('prompt or messages is required.')
-  let sessionToken = await createApiSession({ apiKey }).then(data => data.sessionToken)
-  let response = await fetch(`${ARCOX_API_BASE_URL}/v1/chat/completions`, {
+  const response = await fetch(`${ARCOX_API_BASE_URL}/v1/chat/completions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: input.model || 'arcox/auto',
       messages,
@@ -1467,16 +1414,6 @@ export async function callAiModel(input = {}) {
     }),
     signal: AbortSignal.timeout(Number(input.timeoutMs || 90_000)),
   })
-  if (response.status === 401) {
-    aiSessionCache.delete(hashApiCredential(apiKey))
-    sessionToken = await createApiSession({ apiKey, force: true }).then(data => data.sessionToken)
-    response = await fetch(`${ARCOX_API_BASE_URL}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` },
-      body: JSON.stringify({ model: input.model || 'arcox/auto', messages, temperature: input.temperature ?? 0.7 }),
-      signal: AbortSignal.timeout(Number(input.timeoutMs || 90_000)),
-    })
-  }
   const data = await response.json().catch(() => ({}))
   if (response.status === 402) return { status: 'payment_required', ...data, safeNextStep: 'Deposit USDC to Unified Balance in ARCOX Web UI, enable Auto Pay, then retry.' }
   if (!response.ok || data.error) throw new Error(data?.error?.message || data.error || `HTTP ${response.status}`)
@@ -1491,35 +1428,18 @@ export async function getApiKeyStatus(input = {}) {
 export async function assertTransactionIdentity(input = {}) {
   const status = await getApiKeyStatus(input)
   const key = status?.key
-  if (!status?.apiPassActive || key?.status !== 'active') throw new Error('Transaction blocked: API Pass is not active.')
+  if (key?.status !== 'active') throw new Error('Transaction blocked: API key is not active.')
   if (!key?.agentId) throw new Error('Transaction blocked: API key is not bound to an Agent Identity.')
   const signer = privateKeyToAccount(privateKey()).address
   if (signer.toLowerCase() !== String(key.ownerAddress || '').toLowerCase()) {
     throw new Error('403 wallet_mismatch: local transaction signer does not match the wallet bound to this API key.')
   }
-  return { ownerWallet: signer, agentId: key.agentId, sbtTokenId: key.sbtTokenId, apiKeyIdHash: key.apiKeyIdHash }
+  return { ownerWallet: signer, agentId: key.agentId, apiKeyId: key.id }
 }
 
 export async function createApiSession(input = {}) {
   const apiKey = aiRouterApiKey(input)
-  const cacheKey = hashApiCredential(apiKey)
-  const cached = aiSessionCache.get(cacheKey)
-  if (!input.force && cached && Date.now() < Date.parse(cached.expiresAt) - 30_000) return cached
-  const challenge = await aiRouterFetch('/api/ai-router/sessions/challenge', { apiKey, method: 'POST', body: {} })
-  let lastError
-  for (const key of sessionPrivateKeys(challenge.ownerAddress)) {
-    try {
-      const account = privateKeyToAccount(key)
-      const signature = await account.signMessage({ message: challenge.message })
-      const session = await aiRouterFetch('/api/ai-router/sessions', { apiKey, method: 'POST', body: { challengeId: challenge.challengeId, signature, purpose: input.purpose || 'chat' } })
-      aiSessionCache.set(cacheKey, session)
-      return session
-    } catch (error) {
-      lastError = error
-      if (error?.status !== 403 || !/different wallet|wallet_mismatch/i.test(error?.message || '')) throw error
-    }
-  }
-  throw lastError || new Error('No authorized ARCOX session signer is configured.')
+  return { sessionToken: apiKey, expiresAt: null, legacySessionBypassed: true }
 }
 
 export async function refreshApiSession(input = {}) {
@@ -1539,7 +1459,7 @@ function refreshAgentCredentials() {
   try {
     const mode = statSync(envPath).mode & 0o777
     if ((mode & 0o077) !== 0) return
-    const allowed = new Set(['ARCOX_AI_ROUTER_API_KEY', 'ARCOX_SESSION_PRIVATE_KEY', 'EOA_PRIVATE_KEY', 'AGENT_PRIVATE_KEY'])
+    const allowed = new Set(['ARCOX_AI_ROUTER_API_KEY', 'EOA_PRIVATE_KEY', 'AGENT_PRIVATE_KEY'])
     for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
       const trimmed = line.trim()
       if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
@@ -1547,21 +1467,6 @@ function refreshAgentCredentials() {
       if (allowed.has(key)) process.env[key] = rest.join('=').replace(/^['"]|['"]$/g, '')
     }
   } catch {}
-}
-
-function sessionPrivateKeys(ownerAddress = '') {
-  const keys = [process.env.ARCOX_SESSION_PRIVATE_KEY || '']
-  try {
-    const ownerKey = privateKey()
-    if (privateKeyToAccount(ownerKey).address.toLowerCase() === String(ownerAddress).toLowerCase()) keys.push(ownerKey)
-  } catch {}
-  const valid = [...new Set(keys.filter(key => /^0x[0-9a-fA-F]{64}$/.test(key)))]
-  if (!valid.length) throw new Error('Configure ARCOX_SESSION_PRIVATE_KEY or the API Pass owner wallet key in the protected local agent env.')
-  return valid
-}
-
-function hashApiCredential(value) {
-  return createHash('sha256').update(value).digest('hex')
 }
 
 async function aiRouterFetch(path, { apiKey, method = 'GET', body } = {}) {
@@ -4367,11 +4272,10 @@ async function proxyAiRouterRequest(req, res, body) {
   const suppliedKey = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
   const apiKey = suppliedKey.startsWith('arx_sk_') ? suppliedKey : configuredKey
   if (!apiKey.startsWith('arx_sk_')) throw new Error('Configure the ARCOX API key in Hermes or ARCOX_AI_ROUTER_API_KEY in the local proxy env.')
-  const session = await createApiSession({ apiKey, purpose: req.method === 'GET' ? 'models' : 'chat' })
   const upstream = await fetch(`${ARCOX_API_BASE_URL}${req.url}`, {
     method: req.method,
     headers: {
-      Authorization: `Bearer ${session.sessionToken}`,
+      Authorization: `Bearer ${apiKey}`,
       ...(body ? { 'Content-Type': 'application/json', 'X-ARCOX-IDEMPOTENCY-KEY': createHash('sha256').update(body).digest('hex') } : {}),
     },
     ...(body ? { body } : {}),

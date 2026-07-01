@@ -174,20 +174,20 @@ ARCOX AI Router:
 - MCP can deposit testnet USDC to Unified Balance and enable/disable Auto Pay with preview and explicit confirmation.
 - Auto Pay setup covers each funded EVM source chain; delegated AI spends use only chains whose authorization is ready.
 - API keys use `arx_sk_...`; backend stores only hashes.
-- MCP can create a key with the local `AGENT_PRIVATE_KEY` owner session.
-- The local proxy accepts the `arx_sk_...` key configured in Hermes; `ARCOX_AI_ROUTER_API_KEY` remains an optional fallback.
+- MCP can create a key after wallet authentication.
+- Hermes can use the `arx_sk_...` key directly with the production base URL.
 - Each request is paid from user Unified Balance through backend delegated spend.
 - Provider API keys are never stored in MCP; MCP only calls ARCOX API.
 
 OpenAI-compatible config:
 
 ```text
-base_url = http://127.0.0.1:8787/v1
+base_url = https://arc-dex-bice.vercel.app/v1
 api_key = arx_sk_...
 model = arcox/auto
 ```
 
-The local proxy creates the signed session and forwards requests to `https://arc-dex-bice.vercel.app`. Direct use of the production `/v1` endpoint with a bearer API key is intentionally rejected.
+The local proxy remains optional for MCP transaction tools; it is not required for AI model access.
 
 ARCOX Intel x402 service coverage:
 
@@ -236,12 +236,3 @@ Swap uses EOA by default. To use the Circle proxy wallet, the tool call must exp
 - MCP execution is local to the user's agent process.
 - `arcox-agent status` reports `envSecurityWarnings` when the `.env` file is readable by group/other users.
 - Never paste signing secrets into chat, command arguments, logs, or application configuration.
-# API Pass sessions
-
-New AI Router keys mint a non-transferable ARCOX API Pass on Arc Testnet. The key alone cannot call AI models. Configure the dedicated session signer only in the central env, then run:
-
-```bash
-arcox-agent serve --port 8787
-```
-
-Use `http://127.0.0.1:8787/v1` as the OpenAI-compatible base URL. The local proxy signs a short-lived challenge and never sends the private key to ARCOX.

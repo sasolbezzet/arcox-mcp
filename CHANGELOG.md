@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.36
+
+- Restore standard bearer API keys and direct production OpenAI-compatible access without API Pass or signed sessions.
+
 ## 0.1.35
 
 - Accept the Hermes API key through the local signed-session proxy without requiring a duplicate API key env entry.

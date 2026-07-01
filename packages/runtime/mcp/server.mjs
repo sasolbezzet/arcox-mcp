@@ -10,7 +10,6 @@ import {
   assertTransactionIdentity,
   checkPaymentStatus,
   callAiModel,
-  createApiSession,
   completeAgentJob,
   createAiApiKey,
   createIdentityBoundAgentJob,
@@ -53,7 +52,6 @@ import {
   readAgent,
   readJob,
   registerAgentIdentity,
-  refreshApiSession,
   setAgentJobBudget,
   selectAgentIdentity,
   setAiRouterAutoPay,
@@ -390,7 +388,7 @@ const tools = [
   },
   {
     name: 'create_ai_api_key',
-    description: 'Create an ARCOX AI Router API key and mint its non-transferable API Pass on Arc. Returns the key once; backend stores only its hash.',
+    description: 'Create a standard ARCOX AI Router API key. Returns the key once; backend stores only its hash.',
     inputSchema: {
       type: 'object',
       properties: { ownerAddress: { type: 'string' }, label: { type: 'string' } },
@@ -398,18 +396,8 @@ const tools = [
     },
   },
   {
-    name: 'create_api_session',
-    description: 'Create a short-lived ARCOX API session by signing a backend challenge with the local API Pass owner or authorized session delegate.',
-    inputSchema: { type: 'object', properties: { apiKey: { type: 'string' } }, additionalProperties: false },
-  },
-  {
-    name: 'refresh_api_session',
-    description: 'Replace the cached ARCOX API session with a newly signed short-lived session.',
-    inputSchema: { type: 'object', properties: { apiKey: { type: 'string' } }, additionalProperties: false },
-  },
-  {
     name: 'get_api_key_status',
-    description: 'Check API key, API Pass SBT, and session requirements without exposing the key.',
+    description: 'Check API key status without exposing the key.',
     inputSchema: { type: 'object', properties: { apiKey: { type: 'string' } }, additionalProperties: false },
   },
   {
@@ -429,7 +417,7 @@ const tools = [
   },
   {
     name: 'call_ai_model',
-    description: 'Call ARCOX AI Router through a short-lived signed session. The arx_sk key alone cannot call the provider.',
+    description: 'Call ARCOX AI Router directly with a standard arx_sk API key.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1391,8 +1379,6 @@ async function rpcResponse(message) {
     }
     if (name === 'create_ai_api_key') return result(id, await createAiApiKey(args))
     if (name === 'delete_ai_api_key') return result(id, await deleteAiApiKey(args))
-    if (name === 'create_api_session') return result(id, await createApiSession(args))
-    if (name === 'refresh_api_session') return result(id, await refreshApiSession(args))
     if (name === 'get_api_key_status') return result(id, await getApiKeyStatus(args))
     if (name === 'list_ai_models') return result(id, await listAiModels(args))
     if (name === 'call_ai_model') return result(id, await callAiModel(args))
