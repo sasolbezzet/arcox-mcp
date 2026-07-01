@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.34
+
+- Accept the non-secret `arcox-local` credential only on the localhost AI proxy so Hermes does not need the real API key in its config.
+
 ## 0.1.33
 
 - Repair API Pass creation after session signer fallback was introduced.
