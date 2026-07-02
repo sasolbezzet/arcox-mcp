@@ -1426,15 +1426,8 @@ export async function getApiKeyStatus(input = {}) {
 }
 
 export async function assertTransactionIdentity(input = {}) {
-  const status = await getApiKeyStatus(input)
-  const key = status?.key
-  if (key?.status !== 'active') throw new Error('Transaction blocked: API key is not active.')
-  if (!key?.agentId) throw new Error('Transaction blocked: API key is not bound to an Agent Identity.')
   const signer = privateKeyToAccount(privateKey()).address
-  if (signer.toLowerCase() !== String(key.ownerAddress || '').toLowerCase()) {
-    throw new Error('403 wallet_mismatch: local transaction signer does not match the wallet bound to this API key.')
-  }
-  return { ownerWallet: signer, agentId: key.agentId, apiKeyId: key.id }
+  return { ownerWallet: signer }
 }
 
 export async function createApiSession(input = {}) {
