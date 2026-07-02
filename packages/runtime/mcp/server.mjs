@@ -229,6 +229,11 @@ const tools = [
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    name: 'arcox_catalog',
+    description: 'Backward-compatible alias for arcox_service_catalog.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'arcox_execution_guide',
     description: 'Return exact step-by-step tool routes for every ARCOX MCP flow so agents do not guess tool order.',
     inputSchema: {
@@ -1346,7 +1351,7 @@ async function rpcResponse(message) {
     if (isValueMovingCall(name, args)) enforceRateLimit('local-mcp-client')
     if (name === 'arcox_search_docs') return result(id, searchDocs(args))
     if (name === 'arcox_read_doc') return result(id, readDoc(args))
-    if (name === 'arcox_service_catalog') return result(id, serviceCatalog())
+    if (name === 'arcox_service_catalog' || name === 'arcox_catalog') return result(id, serviceCatalog())
     if (name === 'arcox_execution_guide') return result(id, getExecutionGuide(args))
     if (name === 'arcox_ui_map') return result(id, { webUrl: ARCOX_WEB_URL, apiUrl: ARCOX_API_URL, pages, actions, chainSupport, retailRules })
     if (name === 'arcox_action_plan') return result(id, actionPlan(args))
