@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.40
+
+- Report the published `arcox-mcp` package version dynamically in MCP `initialize` responses so release metadata stays in sync.
+
 ## 0.1.39
 
 - Stop exporting the `arcox-agent` global binary from `arcox-mcp` to avoid clobbering the dedicated `arcox-agent` installer package.

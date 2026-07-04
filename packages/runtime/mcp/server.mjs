@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, existsSync, appendFileSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve, relative } from 'node:path'
 import { homedir } from 'node:os'
@@ -64,6 +65,8 @@ import {
 } from '../bin/arcox-agent.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url)
+const { version: MCP_SERVER_VERSION } = require('../../../package.json')
 const agentRoot = join(__dirname, '..')
 const debugPath = resolveDebugPath(process.env.ARCOX_MCP_DEBUG)
 
@@ -1337,7 +1340,7 @@ async function rpcResponse(message) {
           tools: { listChanged: false },
           resources: { subscribe: false, listChanged: false },
         },
-        serverInfo: { name: 'arcox-mcp', version: '0.1.38' },
+        serverInfo: { name: 'arcox-mcp', version: MCP_SERVER_VERSION },
       },
     }
   }
