@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.41
+
+- Clarify that swap `amountIn` is a human-readable decimal token amount, never base units, so tool-capable models preserve requests such as `1 EURC` exactly.
+
 ## 0.1.40
 
 - Report the published `arcox-mcp` package version dynamically in MCP `initialize` responses so release metadata stays in sync.

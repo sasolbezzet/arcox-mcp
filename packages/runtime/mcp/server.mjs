@@ -775,7 +775,7 @@ const tools = [
       properties: {
         tokenIn: { type: 'string' },
         tokenOut: { type: 'string' },
-        amountIn: { type: 'string' },
+        amountIn: { type: 'string', description: 'Exact human-readable decimal amount from the user. Example: "1" means exactly 1 token. Never convert this value to base units.' },
         source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
       },
       required: ['tokenIn', 'tokenOut', 'amountIn'],
@@ -790,7 +790,7 @@ const tools = [
       properties: {
         tokenIn: { type: 'string' },
         tokenOut: { type: 'string' },
-        amountIn: { type: 'string' },
+        amountIn: { type: 'string', description: 'Exact human-readable decimal amount copied from the confirmed preview. Example: "1" means exactly 1 token. Never convert this value to base units.' },
         source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
         previewId: { type: 'string' },
         confirmed: { type: 'boolean' },
