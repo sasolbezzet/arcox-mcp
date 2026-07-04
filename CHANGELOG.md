@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.39
+
+- Stop exporting the `arcox-agent` global binary from `arcox-mcp` to avoid clobbering the dedicated `arcox-agent` installer package.
+- Rename the standalone runtime prompt wrapper binary to `arcox-runtime-agent`.
+- Document that `arcox-agent` installs `arcox-mcp` automatically for end-user setup flows.
+
 ## 0.1.36
 
 - Restore standard bearer API keys and direct production OpenAI-compatible access without API Pass or signed sessions.

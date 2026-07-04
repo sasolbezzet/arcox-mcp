@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "arcox-agent": "./bin/arcox-codex-cli.mjs"
+    "arcox-runtime-agent": "./bin/arcox-codex-cli.mjs"
   },
   "scripts": {
     "agent": "node bin/arcox-agent.mjs",

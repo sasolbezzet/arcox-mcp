@@ -2,6 +2,10 @@
 
 ARCOX MCP is a local MCP server and terminal agent for ARCOX DEX retail flows.
 
+For most end users, install `arcox-agent` instead of `arcox-mcp`. The `arcox-agent`
+package pulls `arcox-mcp` automatically and adds the guided `setup`, `sync`, and
+`doctor` flow for Hermes/Codex.
+
 It exposes tools for:
 
 - Wallet balances across EOA, Circle proxy wallet, and Solana Devnet
@@ -38,6 +42,15 @@ Or run without global install:
 npx arcox-mcp
 ```
 
+Global `arcox-mcp` installation exposes:
+
+- `arcox-mcp` for the stdio MCP server
+- `arcox` for the low-level CLI
+- `arcox-runtime-agent` for the standalone runtime prompt wrapper
+
+It does not install the user-facing `arcox-agent` setup wrapper. That wrapper lives in
+the separate `arcox-agent` package and installs `arcox-mcp` automatically.
+
 ## Environment
 
 Keep backend and user signing secrets in separate trust domains:
@@ -67,7 +80,7 @@ Native bridge uses the local EOA agent wallet only. Circle Wallet source support
 The backend reads `~/arc-dex-api/.env`; the local agent reads `~/.arcox/agent.env`. The backend never receives the user wallet key, and secret values are never printed.
 
 ```bash
-arcox-agent status
+arcox-runtime-agent status
 ```
 
 ## MCP Config
@@ -213,14 +226,14 @@ Do not tell users gas-free nanopayments are live. Unified Balance/Gateway are pa
 ## CLI Examples
 
 ```bash
-arcox-agent status
-arcox-agent "show all wallet balances"
-arcox-agent "quote swap 1 eurc to usdc from eoa"
-arcox-agent "quote bridge 1 usdc from arc to base"
-arcox-agent "send 1 eurc from eoa to 0x..."
-arcox-agent "create payment request 10 usdc to 0xMerchant for AI agent setup"
-arcox-agent "quote payment invoice inv_..."
-arcox-agent "retry bridge 0xBURN_TX from arbitrum sepolia to arc"
+arcox-runtime-agent status
+arcox-runtime-agent "show all wallet balances"
+arcox-runtime-agent "quote swap 1 eurc to usdc from eoa"
+arcox-runtime-agent "quote bridge 1 usdc from arc to base"
+arcox-runtime-agent "send 1 eurc from eoa to 0x..."
+arcox-runtime-agent "create payment request 10 usdc to 0xMerchant for AI agent setup"
+arcox-runtime-agent "quote payment invoice inv_..."
+arcox-runtime-agent "retry bridge 0xBURN_TX from arbitrum sepolia to arc"
 ```
 
 For execution, inspect the preview first and then confirm.
@@ -234,5 +247,5 @@ Swap uses EOA by default. To use the Circle proxy wallet, the tool call must exp
 - User signing secrets exist only in `~/.arcox/agent.env`; backend/provider secrets remain in `~/arc-dex-api/.env`. Both use permission `600`.
 - ARCOX DEX web UI does not receive the private key.
 - MCP execution is local to the user's agent process.
-- `arcox-agent status` reports `envSecurityWarnings` when the `.env` file is readable by group/other users.
+- `arcox-runtime-agent status` reports `envSecurityWarnings` when the `.env` file is readable by group/other users.
 - Never paste signing secrets into chat, command arguments, logs, or application configuration.
