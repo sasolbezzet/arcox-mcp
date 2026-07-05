@@ -42,6 +42,7 @@ import {
   createTransferInstruction,
   getAssociatedTokenAddress,
 } from '@solana/spl-token'
+import { requiredBigInt } from './numeric.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const AGENT_HOME = dirname(__dirname)
@@ -583,6 +584,8 @@ function loadLocalEnv() {
   for (const envPath of envPaths) {
     if (!existsSync(envPath)) continue
     loadedEnvFiles.push(envPath)
+    const mode = statSync(envPath).mode & 0o777
+    if ((mode & 0o077) !== 0) continue
     const lines = readFileSync(envPath, 'utf8').split(/\r?\n/)
     for (const line of lines) {
       const trimmed = line.trim()
@@ -2760,24 +2763,6 @@ async function executeEoaPreparedSwap({ owner, tokenIn, tokenOut, apiTokenIn, ap
     await publicClient.waitForTransactionReceipt({ hash: swapTx })
     steps.push({ name: `${leg.tokenIn} -> ${leg.tokenOut}`, status: 'success', txHash: swapTx, explorerUrl: EXPLORER_TX + swapTx, amountOut: leg.amountOut })
   }
-  let feeTx = ''
-  let platformFeeError = ''
-  const feeAmount = String(prepared.platformFee?.amount || '0')
-  const feeUnits = parseUnits(feeAmount, ARC_TOKENS[tokenIn].decimals)
-  const tokenInAddress = getAddress(ARC_TOKENS[tokenIn].address)
-  if (feeUnits > 0n) {
-    try {
-      feeTx = await walletClient.writeContract({
-        address: tokenInAddress,
-        abi: erc20Abi,
-        functionName: 'transfer',
-        args: [getAddress(prepared.platformFee?.treasury || process.env.ARCOX_FEE_TREASURY || owner), feeUnits],
-      })
-      await publicClient.waitForTransactionReceipt({ hash: feeTx })
-    } catch (error) {
-      platformFeeError = error.message
-    }
-  }
   return {
     status: 'submitted',
     action: 'swap',
@@ -2800,13 +2785,9 @@ async function executeEoaPreparedSwap({ owner, tokenIn, tokenOut, apiTokenIn, ap
       steps,
       platformFee: {
         ...prepared.platformFee,
-        txHash: feeTx || undefined,
-        error: platformFeeError || undefined,
       },
     },
-    note: platformFeeError
-      ? `EOA swap executed through Circle Stablecoin Service adapter, but platform fee transfer failed: ${platformFeeError}`
-      : 'EOA swap executed through Circle Stablecoin Service with the configured local signer.',
+    note: 'EOA swap executed through Circle Stablecoin Service with the configured local signer. The adapter collects the quoted platform fee inside the swap transaction.',
   }
 }
 
@@ -2816,11 +2797,11 @@ function normalizeAdapterExecutionParams(params = {}) {
     instructions: (params.instructions || []).map(item => ({
       target: getAddress(item.target),
       data: item.data,
-      value: requiredBigInt(item.value ?? 0, 'instruction.value'),
+      value: requiredBigInt(item.value ?? 0, 'instruction.value', true),
       tokenIn: getAddress(item.tokenIn),
-      amountToApprove: requiredBigInt(item.amountToApprove ?? 0, 'instruction.amountToApprove'),
+      amountToApprove: requiredBigInt(item.amountToApprove ?? 0, 'instruction.amountToApprove', true),
       tokenOut: getAddress(item.tokenOut),
-      minTokenOut: requiredBigInt(item.minTokenOut ?? 0, 'instruction.minTokenOut'),
+      minTokenOut: requiredBigInt(item.minTokenOut ?? 0, 'instruction.minTokenOut', true),
     })),
     tokens: (params.tokens || []).map(item => ({
       token: getAddress(item.token),
@@ -2829,15 +2810,6 @@ function normalizeAdapterExecutionParams(params = {}) {
     execId: requiredBigInt(params.execId, 'execution.execId'),
     deadline: requiredBigInt(params.deadline, 'execution.deadline'),
     metadata: params.metadata || '0x',
-  }
-}
-
-function requiredBigInt(value, field) {
-  if (value === undefined || value === null || value === '') throw new Error(`Swap ${field} is missing; no transaction was submitted.`)
-  try {
-    return BigInt(value)
-  } catch {
-    throw new Error(`Swap ${field} is invalid; no transaction was submitted.`)
   }
 }
 

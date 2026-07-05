@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.42
+
+- Prevent EOA swaps from sending a second platform-fee transfer after the Circle adapter already collected the quoted fee.
+- Normalize optional empty RPC quantities without weakening required swap execution fields.
+- Refuse to load local signing secrets from group/world-accessible env files.
+- Update viem/ws and add regression tests for transaction hardening.
+
 ## 0.1.41
 
 - Clarify that swap `amountIn` is a human-readable decimal token amount, never base units, so tool-capable models preserve requests such as `1 EURC` exactly.

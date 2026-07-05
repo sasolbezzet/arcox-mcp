@@ -1,7 +1,7 @@
 {
   "name": "arcox-mcp",
   "private": false,
-  "version": "0.1.41",
+  "version": "0.1.42",
   "type": "module",
   "description": "ARCOX DEX MCP server and terminal agent for retail swap, bridge, send, ARCOX Pay invoices, balances, history, retry bridge, and agentic jobs.",
   "license": "MIT",
@@ -52,6 +52,7 @@
     "agent": "node packages/runtime/bin/arcox-agent.mjs",
     "codex-agent": "node packages/runtime/bin/arcox-codex-cli.mjs",
     "mcp": "node packages/mcp-server/server.mjs",
+    "test": "npm run check && node --test test/*.test.mjs",
     "check": "node --check packages/runtime/bin/arcox-agent.mjs && node --check packages/runtime/mcp/server.mjs && node --check packages/mcp-server/server.mjs && node --check packages/cli/bin/arcox.mjs",
     "compile:router": "node packages/runtime/scripts/compile-router.mjs",
     "deploy:router": "node packages/runtime/scripts/deploy-router.mjs",
@@ -64,12 +65,16 @@
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "bs58": "^6.0.0",
-    "viem": "^2.50.4"
+    "viem": "^2.54.3"
   },
   "devDependencies": {
     "solc": "^0.8.35"
   },
   "overrides": {
-    "tmp": "^0.2.7"
+    "tmp": "^0.2.7",
+    "jayson": {
+      "uuid": "^11.1.1"
+    },
+    "ws": "^8.21.0"
   }
 }
