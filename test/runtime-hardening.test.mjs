@@ -19,3 +19,14 @@ test('EOA swap does not send a second platform-fee transfer', async () => {
   assert.doesNotMatch(implementation, /functionName:\s*['"]transfer['"]/)
   assert.match(implementation, /adapter collects the quoted platform fee inside the swap transaction/)
 })
+
+test('Unified Balance adapter routes Arc SDK chain definitions through ARC_RPC', async () => {
+  const source = await readFile(new URL('../packages/runtime/bin/arcox-agent.mjs', import.meta.url), 'utf8')
+  const start = source.indexOf('function unifiedBalanceAdapter()')
+  const end = source.indexOf('function normalizeUnifiedBalanceChain', start)
+  assert.ok(start >= 0 && end > start)
+  const implementation = source.slice(start, end)
+  assert.match(implementation, /chain\?\.id === arcTestnet\.id/)
+  assert.match(implementation, /chain\?\.chainId === arcTestnet\.id/)
+  assert.match(implementation, /rpcTransport\(ARC_RPC\)/)
+})

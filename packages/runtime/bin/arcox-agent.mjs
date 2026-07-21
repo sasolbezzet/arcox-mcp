@@ -1352,7 +1352,7 @@ function unifiedBalanceKit() {
 
 function unifiedBalanceAdapter() {
   if (!agentUnifiedBalanceAdapter) {
-    const clientForChain = chain => chain?.chainId === arcTestnet.id
+    const clientForChain = chain => (chain?.id === arcTestnet.id || chain?.chainId === arcTestnet.id)
       ? { chain: arcTestnet, transport: rpcTransport(ARC_RPC) }
       : { chain }
     agentUnifiedBalanceAdapter = createViemAdapterFromPrivateKey({
