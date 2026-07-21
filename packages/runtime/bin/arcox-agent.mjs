@@ -51,7 +51,7 @@ const loadedEnvFiles = []
 process.umask(0o077)
 loadLocalEnv()
 
-const ARC_RPC = process.env.ARC_RPC || 'https://rpc.testnet.arc.network/'
+const ARC_RPC = process.env.ARC_RPC || 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/swrm_cb280d6a2612407c4a1dfc8ae235c0ae62bdfe0740559a355dcb7c48b22b345a'
 const EXPLORER_TX = 'https://testnet.arcscan.app/tx/'
 const AGENTIC_COMMERCE_CONTRACT = '0x0747EEf0706327138c69792bF28Cd525089e4583'
 const IDENTITY_REGISTRY = '0x8004A818BFB912233c491871b3d84c89A494BD9e'
@@ -1351,7 +1351,19 @@ function unifiedBalanceKit() {
 }
 
 function unifiedBalanceAdapter() {
-  if (!agentUnifiedBalanceAdapter) agentUnifiedBalanceAdapter = createViemAdapterFromPrivateKey({ privateKey: privateKey() })
+  if (!agentUnifiedBalanceAdapter) {
+    const clientForChain = chain => chain?.chainId === arcTestnet.id
+      ? { chain: arcTestnet, transport: rpcTransport(ARC_RPC) }
+      : { chain }
+    agentUnifiedBalanceAdapter = createViemAdapterFromPrivateKey({
+      privateKey: privateKey(),
+      getPublicClient: ({ chain }) => createPublicClient(clientForChain(chain)),
+      getWalletClient: ({ chain, account }) => createWalletClient({
+        ...clientForChain(chain),
+        account,
+      }),
+    })
+  }
   return agentUnifiedBalanceAdapter
 }
 
