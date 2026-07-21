@@ -46,6 +46,7 @@ import { requiredBigInt } from './numeric.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const AGENT_HOME = dirname(__dirname)
+const STATE_HOME = process.env.ARCOX_STATE_HOME || join(homedir(), '.arcox')
 const loadedEnvFiles = []
 
 process.umask(0o077)
@@ -85,8 +86,8 @@ const PLATFORM_FEE_BPS = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
 const ARC_APPKIT_ADAPTER = '0xBBD70b01a1CAbc96d5b7b129Ae1AAabdf50dd40b'
 const UNIFIED_BALANCE_CHAINS = new Set(['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'])
 const SOLANA_FEE_TREASURY = process.env.SOLANA_FEE_TREASURY || '4kAf2Qxf9KnbnKo7ukPMMu8q1UButJYNik4yQtvWhExw'
-const AUTO_MINT_DIR = join(AGENT_HOME, '.arcox-auto-mint')
-const TX_HISTORY_FILE = join(AGENT_HOME, '.arcox-agent-history.json')
+const AUTO_MINT_DIR = join(STATE_HOME, '.arcox-auto-mint')
+const TX_HISTORY_FILE = join(STATE_HOME, '.arcox-agent-history.json')
 const AUTO_MINT_STALE_MS = Number(process.env.AUTO_MINT_STALE_MS || 5 * 60 * 1000)
 const AUTO_MINT_MAX_RECOVERIES = Number(process.env.AUTO_MINT_MAX_RECOVERIES || 3)
 const ARC_TOKENS = {
@@ -687,6 +688,16 @@ function autoMintJobId(burnTx) {
   return String(burnTx || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 72)
 }
 
+function autoMintWorkerIsActive(pid) {
+  if (!Number.isInteger(Number(pid)) || Number(pid) <= 0) return false
+  try {
+    process.kill(Number(pid), 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function spawnAutoMintWorker({ burnTx, from, to, owner, delayMs = 0 }) {
   const args = [
     fileURLToPath(import.meta.url),
@@ -698,7 +709,7 @@ function spawnAutoMintWorker({ burnTx, from, to, owner, delayMs = 0 }) {
   ]
   if (delayMs > 0) args.push('--delay-ms', String(delayMs))
   const child = spawn(process.execPath, args, {
-    cwd: AGENT_HOME,
+    cwd: STATE_HOME,
     env: process.env,
     detached: true,
     stdio: 'ignore',
@@ -763,7 +774,15 @@ function rescheduleAutoMintAfterFailure({ jobId, burnTx, fromChain, toChain, own
 function scheduleAutoMint({ burnTx, fromInfo, toInfo, owner }) {
   if (!burnTx) return null
   const jobId = autoMintJobId(burnTx)
+  const existing = readAutoMintStatus(jobId)
+  if (existing?.result?.mintTx || ['complete', 'complete_external'].includes(existing?.status)) {
+    return { jobId, pid: existing.pid || null, statusFile: join(AUTO_MINT_DIR, `${jobId}.json`), status: existing.status }
+  }
+  if (existing && autoMintWorkerIsActive(existing.pid)) {
+    return { jobId, pid: existing.pid, statusFile: join(AUTO_MINT_DIR, `${jobId}.json`), status: existing.status }
+  }
   writeAutoMintStatus(jobId, {
+    ...existing,
     status: 'scheduled',
     action: 'auto-mint-bridge',
     owner,
@@ -776,6 +795,7 @@ function scheduleAutoMint({ burnTx, fromInfo, toInfo, owner }) {
     jobId,
     pid,
     statusFile: join(AUTO_MINT_DIR, `${jobId}.json`),
+    status: 'scheduled',
   }
 }
 
@@ -2563,7 +2583,12 @@ async function autoMintBridge() {
   const delayMs = Number(arg('delay-ms') || '0')
   if (delayMs > 0) await sleep(delayMs)
   const jobId = autoMintJobId(burnTx)
+  const existing = readAutoMintStatus(jobId)
+  if (existing?.result?.mintTx || ['complete', 'complete_external'].includes(existing?.status)) {
+    return existing
+  }
   writeAutoMintStatus(jobId, {
+    ...(existing || {}),
     status: 'running',
     action: 'auto-mint-bridge',
     owner,
@@ -4007,8 +4032,11 @@ function syncCompletedAutoMintStatus(job, completed) {
   return writeAutoMintStatus(autoMintJobId(job.burnTx), next)
 }
 
-function recoverStaleAutoMint(job) {
+function recoverStaleAutoMint(job, completed) {
+  if (completed?.mintTx) return syncCompletedAutoMintStatus(job, completed)
+  if (job?.result?.mintTx || ['complete', 'complete_external'].includes(job?.status)) return job
   if (!job?.burnTx || !['scheduled', 'running', 'rescheduled'].includes(job.status)) return job
+  if (autoMintWorkerIsActive(job.pid)) return job
   const updatedAt = Date.parse(job.updatedAt || '')
   if (!Number.isFinite(updatedAt) || Date.now() - updatedAt < AUTO_MINT_STALE_MS) return job
   const recoveries = Number(job.recoveries || 0)
@@ -4049,8 +4077,8 @@ async function syncAutoMintHistory() {
   })
   autoMint = autoMint.map(job => {
     const remote = findByBurnTx(remoteHistory, job.burnTx)
-    if (remote?.status === 'success' && remote.mintTx) return syncCompletedAutoMintStatus(job, remote)
-    return recoverStaleAutoMint(job)
+    const local = findByBurnTx(localWithRemote, job.burnTx)
+    return recoverStaleAutoMint(job, remote?.status === 'success' && remote.mintTx ? remote : local?.status === 'success' && local.mintTx ? local : null)
   })
   const merged = localWithRemote.map(item => {
     const status = autoMint.find(job => String(job.burnTx || '').toLowerCase() === String(item.burnTx || '').toLowerCase())
