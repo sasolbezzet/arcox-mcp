@@ -211,6 +211,13 @@ ARCOX Intel x402 service coverage:
 
 ARCOX Intel x402 payments use Arc transaction memos. The agent pays USDC through the Arc Memo contract, attaching the invoice/payment reference on-chain for reconciliation.
 
+Reconciliation teknis:
+
+- Backend memakai `rpc.testnet.arc.network` (RPC publik sync). Agent env (`~/.arcox/agent.env`) juga harus pakai RPC yang sama untuk menghindari nonce konflik.
+- `eth_getLogs` di-chunk 8,000 block per request untuk menghormati batas 10,000 RPC.
+- Invoice yang `expired` tetap di-reconcile jika ada bukti on-chain. Pembayaran tidak hilang.
+- Agent polling otomatis menunggu sampai 40 detik setelah tx sukses. Jika invoice belum `paid`, gunakan `X-Payment-Id` header untuk retry manual.
+
 ## Circle Gateway Nanopayments Readiness
 
 ARCOX MCP understands Arc x402 payments as:
