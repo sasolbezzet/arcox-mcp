@@ -515,7 +515,7 @@ const tools = [
   },
   {
     name: 'arcox_transaction_history',
-    description: 'Return ARCOX transaction history recorded by the MCP/terminal agent for bridge, swap, and send.',
+    description: 'Return ARCOX transaction history AND auto-mint worker status. Use this to check bridge mint status, swap history, send history, and auto-mint job status (complete/pending/error). The response includes an "autoMint" array with every auto-mint job, its burnTx, mintTx, status, and recovery info. This is the ONLY tool that shows auto-mint worker status — do NOT use arcox_agent_job or intel tools for this.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {

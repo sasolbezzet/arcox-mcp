@@ -1063,7 +1063,8 @@ export function serviceCatalog() {
     services: [
       { name: 'wallet_balances', description: 'Read EOA Arc, Circle proxy wallet, and Solana Devnet balances.' },
       { name: 'swap', description: 'Quote and execute supported Arc swaps with preview-before-execute.' },
-      { name: 'bridge', description: 'Quote and execute supported USDC CCTP testnet bridge routes; slow attestations may use auto-mint worker.' },
+      { name: 'bridge', description: 'Quote and execute supported USDC CCTP testnet bridge routes; slow attestations use an automatic local auto-mint worker.' },
+      { name: 'auto_mint_status', description: 'Use arcox_transaction_history to check local auto-mint worker status by burnTx. Returns status, mintTx, recovery count, and errors; read-only, no identity/API-key auth needed.' },
       { name: 'send', description: 'Quote and send supported Arc tokens from EOA or Circle wallet with confirmation.' },
       { name: 'bridge_retry', description: 'Retry mint for a completed burn transaction when attestation is ready.' },
       { name: 'arcox_pay', description: 'Create/check internal ARCOX Pay invoice/payment workflows.' },
@@ -1074,6 +1075,7 @@ export function serviceCatalog() {
     examplePrompts: [
       'show all wallet balances',
       'quote bridge 1 usdc from arc to base',
+      'check auto mint worker status for 0xBURN_TX',
       'send 1 eurc from eoa to 0x...',
       'retry bridge 0xBURN_TX from arbitrum sepolia to arc',
       'quote swap 1 eurc to usdc',
