@@ -173,7 +173,9 @@ const arcTestnet = defineChain({
 })
 
 function rpcTransport(rpcUrl) {
-  return http(rpcUrl, { timeout: RPC_TIMEOUT_MS })
+  const drpcKey = process.env.DRPC_KEY || ''
+  const fetchOptions = drpcKey && rpcUrl.includes('drpc.org') ? { headers: { Authorization: `Bearer ${drpcKey}` } } : undefined
+  return http(rpcUrl, { timeout: RPC_TIMEOUT_MS, retryCount: 3, ...(fetchOptions ? { fetchOptions } : {}) })
 }
 
 const publicClient = createPublicClient({ chain: arcTestnet, transport: rpcTransport(ARC_RPC) })
