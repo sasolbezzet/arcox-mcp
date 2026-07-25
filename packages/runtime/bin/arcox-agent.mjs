@@ -96,6 +96,67 @@ const ARC_TOKENS = {
   USYC: { address: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C', decimals: 6 },
   CIRBTC: { address: '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF', decimals: 8 },
 }
+const CIRBTC_AMM_ROUTER = process.env.CIRBTC_AMM_ROUTER || '0x0c72563b9846df4355244a9671918e59c620c580'
+const cirBtcRouterAbi = [
+  { type: 'function', name: 'getAmountOut', stateMutability: 'view', inputs: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'amountIn', type: 'uint256' }], outputs: [{ name: '', type: 'uint256' }] },
+  { type: 'function', name: 'swapWithFee', stateMutability: 'nonpayable', inputs: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'amountIn', type: 'uint256' }, { name: 'minAmountOut', type: 'uint256' }], outputs: [{ name: 'amountOut', type: 'uint256' }] },
+  { type: 'function', name: 'getReserves', stateMutability: 'view', inputs: [{ name: 'token0', type: 'address' }, { name: 'token1', type: 'address' }], outputs: [{ name: 'reserve0', type: 'uint256' }, { name: 'reserve1', type: 'uint256' }] },
+]
+function isCirBtcSwap(tokenIn, tokenOut) {
+  return tokenIn === 'CIRBTC' || tokenOut === 'CIRBTC'
+}
+async function quoteCirBtcAmmSwap(tokenIn, tokenOut, amountIn) {
+  const tokenInAddr = ARC_TOKENS[tokenIn].address
+  const tokenOutAddr = ARC_TOKENS[tokenOut].address
+  const amountUnits = parseUnits(amountIn, ARC_TOKENS[tokenIn].decimals)
+  const amountOut = await publicClient.readContract({
+    address: CIRBTC_AMM_ROUTER, abi: cirBtcRouterAbi, functionName: 'getAmountOut',
+    args: [tokenInAddr, tokenOutAddr, amountUnits],
+  })
+  const amountOutDecimal = formatUnits(amountOut, ARC_TOKENS[tokenOut].decimals)
+  const feeBps = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
+  const feeAmount = (Number(amountIn) * feeBps / 10000).toFixed(ARC_TOKENS[tokenIn].decimals)
+  return {
+    available: true,
+    source: 'arcox-amm-router',
+    route: `${tokenIn} → ${tokenOut}`,
+    provider: 'arcox-amm',
+    amountOut: amountOutDecimal,
+    minAmountOut: amountOutDecimal,
+    fee: '0.000000',
+    platformFee: { bps: feeBps, amount: feeAmount, token: tokenIn, swapAmountIn: amountIn },
+    rate: Number(amountOutDecimal) / Number(amountIn || 1),
+  }
+}
+async function executeCirBtcAmmSwap(tokenIn, tokenOut, amountIn) {
+  const { walletClient, account } = wallet()
+  const tokenInAddr = ARC_TOKENS[tokenIn].address
+  const tokenOutAddr = ARC_TOKENS[tokenOut].address
+  const amountUnits = parseUnits(amountIn, ARC_TOKENS[tokenIn].decimals)
+  const approveTx = await walletClient.writeContract({
+    address: tokenInAddr, abi: erc20Abi, functionName: 'approve',
+    args: [CIRBTC_AMM_ROUTER, amountUnits],
+  })
+  await publicClient.waitForTransactionReceipt({ hash: approveTx })
+  const swapTx = await walletClient.writeContract({
+    address: CIRBTC_AMM_ROUTER, abi: cirBtcRouterAbi, functionName: 'swapWithFee',
+    args: [tokenInAddr, tokenOutAddr, amountUnits, 0n],
+  })
+  await publicClient.waitForTransactionReceipt({ hash: swapTx })
+  const amountOut = await publicClient.readContract({
+    address: CIRBTC_AMM_ROUTER, abi: cirBtcRouterAbi, functionName: 'getAmountOut',
+    args: [tokenInAddr, tokenOutAddr, amountUnits],
+  })
+  return {
+    status: 'success', action: 'swap', source: 'eoa-agent-wallet',
+    tokenIn, tokenOut, amountIn,
+    amountOut: formatUnits(amountOut, ARC_TOKENS[tokenOut].decimals),
+    tx: swapTx,
+    explorer: EXPLORER_TX + swapTx,
+    approveTx,
+    note: 'cirBTC swap executed via ARCOX AMM Router with 30bps platform fee.',
+  }
+}
 let agentAppKit
 let agentUnifiedBalanceAdapter
 
@@ -2695,6 +2756,19 @@ export async function executeSwap(intent, owner) {
   if (!ARC_TOKENS[tokenOut]) throw new Error('Swap command needs output token, example: swap 10 USDC to EURC')
   if (tokenIn === tokenOut) throw new Error('Swap input and output token must be different.')
 
+  // cirBTC swaps use on-chain AMM router instead of Circle API
+  if (isCirBtcSwap(tokenIn, tokenOut)) {
+    const result = await executeCirBtcAmmSwap(tokenIn, tokenOut, String(intent.amount))
+    const rec = recordAgentHistory({
+      action: 'swap', source: 'agent-mcp', walletSource: 'eoa',
+      from: tokenIn, to: tokenOut, amount: String(intent.amount), token: tokenIn,
+      status: 'success', tx: result.tx, explorer: result.explorer,
+      approveTx: result.approveTx, note: result.note,
+    }, owner)
+    await pushBackendHistory(owner, rec)
+    return result
+  }
+
   const account = privateKeyToAccount(privateKey())
   const token = await backendSession(account)
   const walletData = source === 'circle' ? await postJson('/api/wallet', { metamaskAddress: owner }, token) : null
@@ -3316,6 +3390,27 @@ export async function quoteSwap(intent) {
   if (!amountIn) throw new Error('Swap quote needs amountIn.')
   if (!ARC_TOKENS[tokenIn]) throw new Error(`Unsupported swap input token: ${tokenIn}`)
   if (!ARC_TOKENS[tokenOut]) throw new Error(`Unsupported swap output token: ${tokenOut}`)
+  // cirBTC swaps use on-chain AMM router instead of Circle API
+  if (isCirBtcSwap(tokenIn, tokenOut)) {
+    const ammQuote = await quoteCirBtcAmmSwap(tokenIn, tokenOut, amountIn)
+    return {
+      status: 'quote', action: 'swap',
+      source: source === 'circle' ? 'circle-wallet-proxy' : 'eoa-agent-wallet',
+      terminalExecution: 'The configured local signer approves and executes the AMM swap transaction.',
+      owner: wallet().account.address,
+      tokenIn, tokenOut, amountIn,
+      quote: ammQuote,
+      routeAvailable: ammQuote.available !== false,
+      route: ammQuote.route || `${tokenIn} -> ${tokenOut}`,
+      provider: ammQuote.provider || ammQuote.source || null,
+      estimatedReceive: ammQuote.amountOut || null,
+      minimumReceive: ammQuote.minAmountOut || null,
+      rate: ammQuote.rate ?? null,
+      platformFee: ammQuote.platformFee || null,
+      approvalRequired: true,
+      safeNextStep: 'Route is available. Show the preview and ask the user to confirm before calling arcox_execute_swap with confirmed=true, previewId, and confirmationText.',
+    }
+  }
   const { account } = wallet()
   const token = await backendSession(account)
   let quote
