@@ -97,7 +97,7 @@ const ARC_TOKENS = {
   USYC: { address: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C', decimals: 6 },
   CIRBTC: { address: '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF', decimals: 8 },
 }
-const CIRBTC_AMM_ROUTER = process.env.CIRBTC_AMM_ROUTER || '0x0c72563b9846df4355244a9671918e59c620c580'
+const CIRBTC_AMM_ROUTER = process.env.CIRBTC_AMM_ROUTER || '0x9f2443691bddd8343590c68e2a2cdec5fd0b6124'
 const cirBtcRouterAbi = [
   { type: 'function', name: 'getAmountOut', stateMutability: 'view', inputs: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'amountIn', type: 'uint256' }], outputs: [{ name: '', type: 'uint256' }] },
   { type: 'function', name: 'swapWithFee', stateMutability: 'nonpayable', inputs: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'amountIn', type: 'uint256' }, { name: 'minAmountOut', type: 'uint256' }], outputs: [{ name: 'amountOut', type: 'uint256' }] },
@@ -106,6 +106,8 @@ const cirBtcRouterAbi = [
 function isCirBtcSwap(tokenIn, tokenOut) {
   return tokenIn === 'CIRBTC' || tokenOut === 'CIRBTC'
 }
+// RouterV2: EURC↔cirBTC routes through USDC pool internally (2-hop multicall).
+// All cirBTC liquidity comes from one USDC-cirBTC pool → rate consistency.
 async function quoteCirBtcAmmSwap(tokenIn, tokenOut, amountIn) {
   const tokenInAddr = ARC_TOKENS[tokenIn].address
   const tokenOutAddr = ARC_TOKENS[tokenOut].address
@@ -155,7 +157,7 @@ async function executeCirBtcAmmSwap(tokenIn, tokenOut, amountIn) {
     tx: swapTx,
     explorer: EXPLORER_TX + swapTx,
     approveTx,
-    note: 'cirBTC swap executed via ARCOX AMM Router with 30bps platform fee.',
+    note: 'cirBTC swap executed via ARCOX AMM RouterV2 with 30bps platform fee.',
   }
 }
 let agentAppKit
