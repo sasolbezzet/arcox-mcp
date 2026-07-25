@@ -20,6 +20,7 @@ import {
   parseUnits,
   toHex,
   encodeFunctionData,
+  fallback,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { AppKit } from '@circle-fin/app-kit'
@@ -235,8 +236,16 @@ const arcTestnet = defineChain({
 
 function rpcTransport(rpcUrl) {
   const drpcKey = process.env.DRPC_KEY || ''
-  const fetchOptions = drpcKey && rpcUrl.includes('drpc.org') ? { headers: { Authorization: `Bearer ${drpcKey}` } } : undefined
-  return http(rpcUrl, { timeout: RPC_TIMEOUT_MS, retryCount: 3, ...(fetchOptions ? { fetchOptions } : {}) })
+  const fallbackUrls = ['https://rpc.testnet.arc.network', 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/swrm_cb280d6a2612407c4a1dfc8ae235c0ae62bdfe0740559a355dcb7c48b22b345a'].filter(u => u !== rpcUrl)
+  const primaryOpts = { timeout: RPC_TIMEOUT_MS, retryCount: 1, ...(drpcKey && rpcUrl.includes('drpc.org') ? { fetchOptions: { headers: { Authorization: `Bearer ${drpcKey}` } } } : {}) }
+  if (rpcUrl.includes('drpc.org') && !drpcKey) {
+    // No DRPC key — skip DRPC, use public RPCs directly to avoid rate limit
+    return fallback([http(fallbackUrls[0], { timeout: RPC_TIMEOUT_MS, retryCount: 2 }), http(fallbackUrls[1], { timeout: RPC_TIMEOUT_MS, retryCount: 2 })], { retryCount: 2, rank: false })
+  }
+  return fallback([
+    http(rpcUrl, primaryOpts),
+    ...fallbackUrls.map(u => http(u, { timeout: RPC_TIMEOUT_MS, retryCount: 1 })),
+  ], { retryCount: 2, rank: false })
 }
 
 const publicClient = createPublicClient({ chain: arcTestnet, transport: rpcTransport(ARC_RPC) })
