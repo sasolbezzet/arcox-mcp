@@ -104,7 +104,8 @@ const cirBtcRouterAbi = [
   { type: 'function', name: 'getReserves', stateMutability: 'view', inputs: [{ name: 'token0', type: 'address' }, { name: 'token1', type: 'address' }], outputs: [{ name: 'reserve0', type: 'uint256' }, { name: 'reserve1', type: 'uint256' }] },
 ]
 function isCirBtcSwap(tokenIn, tokenOut) {
-  return tokenIn === 'CIRBTC' || tokenOut === 'CIRBTC'
+  // Only USDC↔cirBTC goes through AMM router. EURC↔cirBTC uses Circle API path.
+  return (tokenIn === 'USDC' && tokenOut === 'CIRBTC') || (tokenIn === 'CIRBTC' && tokenOut === 'USDC')
 }
 // RouterV2: EURC↔cirBTC routes through USDC pool internally (2-hop multicall).
 // All cirBTC liquidity comes from one USDC-cirBTC pool → rate consistency.
