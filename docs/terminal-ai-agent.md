@@ -40,7 +40,7 @@ AGENT_PRIVATE_KEY=0xYOUR_LOCAL_AGENT_PRIVATE_KEY
 AGENT_NAME=ARCOX Codex Retail Agent
 AGENT_PORT=8787
 ARC_RPC=https://rpc.testnet.arc-node.thecanteenapp.com/v1/swrm_cb280d6a2612407c4a1dfc8ae235c0ae62bdfe0740559a355dcb7c48b22b345a
-ARCOX_API_URL=https://arc-dex-bice.vercel.app
+ARCOX_API_URL=https://arcoxdex.vercel.app
 ARC_AGENT_ID=
 ```
 

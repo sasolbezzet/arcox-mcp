@@ -66,7 +66,7 @@ const SOLANA_DEVNET_RPC = process.env.SOLANA_DEVNET_RPC || 'https://api.devnet.s
 const SOLANA_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'
 const SOLANA_TOKEN_MESSENGER_PROGRAM = 'CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe'
 const SOLANA_MESSAGE_TRANSMITTER_PROGRAM = 'CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC'
-const ARCOX_WEB_URL = process.env.ARCOX_WEB_URL || process.env.ARCOX_API_URL || 'https://arc-dex-bice.vercel.app'
+const ARCOX_WEB_URL = process.env.ARCOX_WEB_URL || process.env.ARCOX_API_URL || 'https://arcoxdex.vercel.app'
 const ARCOX_BACKEND_URL = process.env.ARCOX_BACKEND_URL || 'https://43.163.98.128.nip.io'
 const ARCOX_PAY_API_URL = process.env.ARCOX_PAY_API_URL || ARCOX_WEB_URL
 const ARCOX_API_BASE_URL = process.env.ARCOX_API_BASE_URL || ARCOX_BACKEND_URL
@@ -3800,7 +3800,7 @@ export async function x402PayInvoice(input = {}) {
       token: 'USDC',
       recipient: invoice.recipient,
       sourceOptions: ['auto', 'Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'],
-      safeNextStep: `Open https://arc-dex-bice.vercel.app/intel or /pay/status, choose Pay with Unified Balance, estimate first, then spend. MCP cannot sign Circle AppKit Unified Balance from terminal without a browser wallet session.`,
+      safeNextStep: `Open https://arcoxdex.vercel.app/intel or /pay/status, choose Pay with Unified Balance, estimate first, then spend. MCP cannot sign Circle AppKit Unified Balance from terminal without a browser wallet session.`,
     }
   }
   if (input.confirmed !== true || !isSimpleConfirmationText(input.confirmationText)) {

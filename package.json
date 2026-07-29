@@ -1,11 +1,11 @@
 {
   "name": "arcox-mcp",
   "private": false,
-  "version": "0.1.51",
+  "version": "0.1.52",
   "type": "module",
   "description": "ARCOX DEX MCP server and terminal agent for retail swap, bridge, send, ARCOX Pay invoices, balances, history, retry bridge, and agentic jobs.",
   "license": "MIT",
-  "homepage": "https://arc-dex-bice.vercel.app/?page=docs",
+  "homepage": "https://arcoxdex.vercel.app/?page=docs",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sasolbezzet/arcox-mcp.git"

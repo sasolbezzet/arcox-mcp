@@ -18,7 +18,7 @@ Example MCP config:
       "command": "node",
       "args": ["/path/to/arcox-mcp/packages/runtime/mcp/server.mjs"],
       "env": {
-        "ARCOX_WEB_URL": "https://arc-dex-bice.vercel.app/",
+        "ARCOX_WEB_URL": "https://arcoxdex.vercel.app/",
         "ARCOX_API_URL": "https://43.163.98.128.nip.io"
       }
     }
