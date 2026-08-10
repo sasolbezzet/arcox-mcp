@@ -67,7 +67,8 @@ const SOLANA_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'
 const SOLANA_TOKEN_MESSENGER_PROGRAM = 'CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe'
 const SOLANA_MESSAGE_TRANSMITTER_PROGRAM = 'CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC'
 const ARCOX_WEB_URL = process.env.ARCOX_WEB_URL || process.env.ARCOX_API_URL || 'https://arcoxdex.vercel.app'
-const ARCOX_BACKEND_URL = process.env.ARCOX_BACKEND_URL || 'https://43.134.14.43.nip.io'
+// Public API origin. Vercel proxies requests to the backend; do not expose the VPS hostname to agents.
+const ARCOX_BACKEND_URL = process.env.ARCOX_BACKEND_URL || 'https://arcoxdex.vercel.app'
 const ARCOX_PAY_API_URL = process.env.ARCOX_PAY_API_URL || ARCOX_WEB_URL
 const ARCOX_API_BASE_URL = process.env.ARCOX_API_BASE_URL || ARCOX_BACKEND_URL
 const DEFAULT_AGENT_NAME = process.env.AGENT_NAME || 'ARCOX Codex Retail Agent'

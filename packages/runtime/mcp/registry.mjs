@@ -1,5 +1,6 @@
 export const ARCOX_WEB_URL = process.env.ARCOX_WEB_URL || 'https://arcoxdex.vercel.app/'
-export const ARCOX_API_URL = process.env.ARCOX_API_URL || 'https://43.134.14.43.nip.io'
+// Public API origin. Vercel proxies the API to the private backend; clients must not use the VPS hostname directly.
+export const ARCOX_API_URL = process.env.ARCOX_API_URL || 'https://arcoxdex.vercel.app'
 
 export const pages = [
   {
