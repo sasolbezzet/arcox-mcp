@@ -1,5 +1,5 @@
 export const ARCOX_WEB_URL = process.env.ARCOX_WEB_URL || 'https://arcoxdex.vercel.app/'
-export const ARCOX_API_URL = process.env.ARCOX_API_URL || 'https://43.163.98.128.nip.io'
+export const ARCOX_API_URL = process.env.ARCOX_API_URL || 'https://43.134.14.43.nip.io'
 
 export const pages = [
   {
