@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 
 export const PUBLIC_ARC_RPC = 'https://rpc.testnet.arc.network'
+export const LEGACY_DRPC_ARC_RPC = 'https://arc-testnet.drpc.org'
 const CANTEEN_ENV_FILE = `${homedir()}/.arc-canteen/env`
 
 function readCanteenRpc() {
@@ -33,7 +34,9 @@ export function resolveArcRpc({
   const configured = validRpc(configuredRpc)
   const canteen = validRpc(canteenRpc)
   const envRpc = validRpc(applicationRpc)
-  return (preferCanteen ? configured || canteen || envRpc : configured || envRpc || canteen) || PUBLIC_ARC_RPC
+  const legacyDprc = envRpc === LEGACY_DRPC_ARC_RPC
+  const useCanteen = preferCanteen || legacyDprc
+  return (useCanteen ? configured || canteen || envRpc : configured || envRpc || canteen) || PUBLIC_ARC_RPC
 }
 
 export function arcRpcUrls(options = {}) {
