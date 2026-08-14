@@ -4,6 +4,7 @@ import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { createPublicClient, createWalletClient, defineChain, encodeFunctionData, getAddress, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { resolveArcRpc } from '../config/arcRpc.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = dirname(__dirname)
@@ -19,8 +20,8 @@ const chains = {
   Arc_Testnet: {
     domain: 26,
     usdc: '0x3600000000000000000000000000000000000000',
-    rpc: process.env.ARC_RPC || 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/swrm_cb280d6a2612407c4a1dfc8ae235c0ae62bdfe0740559a355dcb7c48b22b345a',
-    chain: defineChain({ id: 5042002, name: 'Arc Testnet', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [process.env.ARC_RPC || 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/swrm_cb280d6a2612407c4a1dfc8ae235c0ae62bdfe0740559a355dcb7c48b22b345a'] } } }),
+    rpc: resolveArcRpc({ preferCanteen: true }),
+    chain: defineChain({ id: 5042002, name: 'Arc Testnet', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: [resolveArcRpc({ preferCanteen: true })] } } }),
   },
   Ethereum_Sepolia: {
     domain: 0,

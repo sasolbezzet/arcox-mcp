@@ -29,6 +29,7 @@
     "README.md",
     "CHANGELOG.md",
     "packages/runtime/bin",
+    "packages/runtime/config",
     "packages/runtime/mcp",
     "packages/runtime/deployments",
     "packages/runtime/artifacts",

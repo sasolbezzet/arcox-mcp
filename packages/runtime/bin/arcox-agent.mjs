@@ -44,6 +44,7 @@ import {
   getAssociatedTokenAddress,
 } from '@solana/spl-token'
 import { requiredBigInt } from './numeric.mjs'
+import { resolveArcRpc } from '../config/arcRpc.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const AGENT_HOME = dirname(__dirname)
@@ -53,7 +54,7 @@ const loadedEnvFiles = []
 process.umask(0o077)
 loadLocalEnv()
 
-const ARC_RPC = process.env.ARC_RPC || 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/swrm_cb280d6a2612407c4a1dfc8ae235c0ae62bdfe0740559a355dcb7c48b22b345a'
+const ARC_RPC = resolveArcRpc({ preferCanteen: true })
 const EXPLORER_TX = 'https://testnet.arcscan.app/tx/'
 const AGENTIC_COMMERCE_CONTRACT = '0x0747EEf0706327138c69792bF28Cd525089e4583'
 const IDENTITY_REGISTRY = '0x8004A818BFB912233c491871b3d84c89A494BD9e'
@@ -240,7 +241,7 @@ const arcTestnet = defineChain({
 
 function rpcTransport(rpcUrl) {
   const drpcKey = process.env.DRPC_KEY || ''
-  const fallbackUrls = ['https://rpc.testnet.arc.network', 'https://rpc.testnet.arc-node.thecanteenapp.com/v1/swrm_cb280d6a2612407c4a1dfc8ae235c0ae62bdfe0740559a355dcb7c48b22b345a'].filter(u => u !== rpcUrl)
+  const fallbackUrls = ['https://rpc.testnet.arc.network'].filter(u => u !== rpcUrl)
   const primaryOpts = { timeout: RPC_TIMEOUT_MS, retryCount: 1, ...(drpcKey && rpcUrl.includes('drpc.org') ? { fetchOptions: { headers: { Authorization: `Bearer ${drpcKey}` } } } : {}) }
   if (rpcUrl.includes('drpc.org') && !drpcKey) {
     // No DRPC key — skip DRPC, use public RPCs directly to avoid rate limit
