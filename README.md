@@ -213,8 +213,8 @@ ARCOX Intel x402 payments use Arc transaction memos. The agent pays USDC through
 
 Reconciliation teknis:
 
-- Backend memakai `rpc.testnet.arc.network` (RPC publik sync). Agent env (`~/.arcox/agent.env`) juga harus pakai RPC yang sama untuk menghindari nonce konflik.
-- `eth_getLogs` di-chunk 8,000 block per request untuk menghormati batas 10,000 RPC.
+- Backend production memilih RPC Canteen dari environment lokal/server secara aman; RPC publik Arc tetap menjadi fallback. Agent membaca endpoint Canteen dari `arc-canteen`/`~/.arc-canteen/env` dan tidak menyimpan token di source atau frontend.
+- Scan `eth_getLogs` yang memakai Arc dibatasi ke chunk konservatif 2,000 block agar kompatibel dengan batas parameter dan ukuran respons Canteen.
 - Invoice yang `expired` tetap di-reconcile jika ada bukti on-chain. Pembayaran tidak hilang.
 - Agent polling otomatis menunggu sampai 40 detik setelah tx sukses. Jika invoice belum `paid`, gunakan `X-Payment-Id` header untuk retry manual.
 
