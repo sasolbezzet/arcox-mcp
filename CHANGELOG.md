@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.56
+
+- Include `docs/hermes-onboarding.md` in the npm tarball so new users can read the install -> login -> transact flow after `npm install -g arcox-mcp`.
+- Sync published package version with the GitHub release that documents Hermes remote OAuth MSCA pairing.
+
 ## 0.1.55
 
 - Document Hermes/Claude remote OAuth MCP connection model for MSCA transactions. Hermes connects to the hosted `/mcp` endpoint with `auth: oauth`, completes ARCOX browser Passkey pairing, and the backend binds the MCP session to the active Agent Wallet (MSCA). No `ARCOX_MSCA_SESSION_TOKEN` env entry is required.
