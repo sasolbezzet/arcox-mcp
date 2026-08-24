@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.55
+
+- Document Hermes/Claude remote OAuth MCP connection model for MSCA transactions. Hermes connects to the hosted `/mcp` endpoint with `auth: oauth`, completes ARCOX browser Passkey pairing, and the backend binds the MCP session to the active Agent Wallet (MSCA). No `ARCOX_MSCA_SESSION_TOKEN` env entry is required.
+- Support same-device binding (`redirect_host: localhost`) and cross-device binding via Cloudflare Quick Tunnel or paste-back.
+- Add `arcox_wallet_modes` and `arcox_msca_status` tools so agents can describe EOA, SCA, and MSCA sources and read the active MSCA session.
+- Normalize tool `source` across `eoa`, `sca`/`circle`, and `msca`, keeping preview/confirmation guards for every value-moving action.
+
 ## 0.1.42
 
 - Prevent EOA swaps from sending a second platform-fee transfer after the Circle adapter already collected the quoted fee.

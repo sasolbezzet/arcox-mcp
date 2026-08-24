@@ -1,9 +1,9 @@
 {
   "name": "arcox-mcp",
   "private": false,
-  "version": "0.1.54",
+  "version": "0.1.55",
   "type": "module",
-  "description": "ARCOX DEX MCP server and terminal agent for retail swap, bridge, send, ARCOX Pay invoices, balances, history, retry bridge, and agentic jobs.",
+  "description": "ARCOX DEX MCP server and terminal agent with Hermes/Claude remote OAuth MSCA support, local EOA/SCA execution, and quote-before-execute safety for swap, bridge, send, ARCOX Pay invoices, balances, history, retry bridge, and agentic jobs.",
   "license": "MIT",
   "homepage": "https://arcoxdex.vercel.app/?page=docs",
   "repository": {

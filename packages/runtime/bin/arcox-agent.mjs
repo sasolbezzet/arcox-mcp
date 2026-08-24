@@ -44,6 +44,7 @@ import {
   getAssociatedTokenAddress,
 } from '@solana/spl-token'
 import { requiredBigInt } from './numeric.mjs'
+import { normalizeWalletSource } from '../mcp/walletModes.mjs'
 import { resolveArcRpc } from '../config/arcRpc.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -886,6 +887,99 @@ function wallet() {
   const account = privateKeyToAccount(privateKey())
   const walletClient = createWalletClient({ account, chain: arcTestnet, transport: rpcTransport(ARC_RPC) })
   return { account, walletClient }
+}
+
+function executionSource(intent = {}) {
+  const source = normalizeWalletSource(intent.source || intent.walletSource, 'eoa')
+  if (source === 'msca') return 'msca'
+  if (source === 'sca') return 'circle'
+  return 'eoa'
+}
+
+function mscaSessionToken() {
+  const token = String(process.env.ARCOX_MSCA_SESSION_TOKEN || process.env.MSCA_SESSION_TOKEN || '').trim()
+  if (!token) {
+    throw new Error('MSCA source requires ARCOX_MSCA_SESSION_TOKEN (an active Passkey/MSCA session token) in the local agent environment.')
+  }
+  return token
+}
+
+function mscaWalletAddress() {
+  return String(process.env.ARCOX_MSCA_WALLET_ADDRESS || process.env.MSCA_WALLET_ADDRESS || '').trim()
+}
+
+export async function mscaStatus() {
+  const token = mscaSessionToken()
+  const status = await backendGet('/api/msca/status', token)
+  return {
+    ...status,
+    source: 'msca-session',
+    configuredWalletAddress: mscaWalletAddress() || null,
+    configuredAddressMatches: !mscaWalletAddress() || !status.walletAddress || mscaWalletAddress().toLowerCase() === String(status.walletAddress).toLowerCase(),
+  }
+}
+
+async function quoteMscaSend(intent) {
+  const token = mscaSessionToken()
+  const configuredAddress = mscaWalletAddress()
+  const quote = await postJson('/api/msca/send/quote', {
+    to: getAddress(intent.to),
+    amount: String(intent.amount),
+    token: normalizeArcTokenKey(intent.token || 'USDC'),
+    chain: intent.chain || intent.fromChain || 'arc-testnet',
+    ...(configuredAddress ? { walletAddress: configuredAddress } : {}),
+  }, token, SEND_ESTIMATE_TIMEOUT_MS)
+  if (configuredAddress && quote.walletAddress && configuredAddress.toLowerCase() !== String(quote.walletAddress).toLowerCase()) {
+    throw new Error('Configured MSCA wallet address does not match the authenticated MSCA session.')
+  }
+  return {
+    ...quote,
+    source: 'msca-session',
+    walletType: 'MSCA',
+    terminalExecution: 'ARCOX backend signs and relays a UserOperation through the active MSCA session key.',
+  }
+}
+
+async function executeMscaSend(intent) {
+  const token = mscaSessionToken()
+  const response = await postJson('/api/msca/send', {
+    to: getAddress(intent.to),
+    amount: String(intent.amount),
+    token: normalizeArcTokenKey(intent.token || 'USDC'),
+    chain: intent.chain || intent.fromChain || 'arc-testnet',
+    previewId: String(intent.backendPreviewId || ''),
+    confirmed: true,
+    confirmationText: String(intent.confirmationText || '').trim().toLowerCase(),
+  }, token, SEND_EXECUTION_TIMEOUT_MS)
+  const owner = String(response.walletAddress || mscaWalletAddress() || '').toLowerCase()
+  const result = {
+    status: response.status === 'executed' ? 'submitted' : response.status,
+    action: 'send',
+    source: 'msca-session',
+    walletType: 'MSCA',
+    from: response.walletAddress || mscaWalletAddress() || null,
+    to: response.to || getAddress(intent.to),
+    amount: String(response.amount || intent.amount),
+    token: response.token || normalizeArcTokenKey(intent.token || 'USDC'),
+    tx: response.txHash || response.userOpHash || null,
+    userOpHash: response.userOpHash || null,
+    explorer: response.explorerUrl || null,
+    previewId: intent.previewId || null,
+  }
+  if (owner) {
+    const rec = recordAgentHistory({
+      action: 'send', from: result.from, to: result.to, amount: result.amount, token: result.token,
+      status: result.status === 'submitted' ? 'success' : 'pending', walletSource: 'msca',
+      tx: result.tx, explorer: result.explorer,
+      note: 'Send executed through the authenticated MSCA session key.',
+    }, owner)
+    await pushBackendHistory(owner, rec)
+  }
+  return result
+}
+
+function assertMscaUnsupported(action) {
+  throw new Error(`MSCA source is not enabled for ${action} in the local runtime yet. Use arcox_quote_send/arcox_execute_send with source="msca", or select source="eoa"/"sca".`)
 }
 
 function solanaKeypair() {
@@ -3142,10 +3236,11 @@ export async function walletBalances() {
 }
 
 export async function quoteBridge(intent) {
+  const source = executionSource(intent)
+  if (source === 'msca') assertMscaUnsupported('bridge')
   const { account } = wallet()
   const fromChain = normalizeChainName(intent.fromChain) || intent.fromChain
   const toChain = normalizeChainName(intent.toChain) || intent.toChain
-  const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   const token = normalizeBridgeTokenKey(intent.token)
   if (!intent.amount || Number(intent.amount) <= 0) throw new Error('Bridge quote needs a positive amount.')
   const fromInfo = cctpChains[fromChain]
@@ -3294,8 +3389,9 @@ export async function quoteBridge(intent) {
 }
 
 export async function quoteSend(intent) {
+  const source = executionSource(intent)
+  if (source === 'msca') return quoteMscaSend(intent)
   const { account } = wallet()
-  const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   const tokenKey = normalizeArcTokenKey(intent.token)
   const apiTokenKey = apiArcTokenKey(intent.token)
   const token = ARC_TOKENS[tokenKey]
@@ -3395,12 +3491,13 @@ export async function quoteSend(intent) {
 }
 
 export async function quoteSwap(intent) {
+  const source = executionSource(intent)
+  if (source === 'msca') assertMscaUnsupported('swap')
   const tokenIn = normalizeArcTokenKey(intent.tokenIn || 'USDC')
   const tokenOut = normalizeArcTokenKey(intent.tokenOut || '', '')
   const apiTokenIn = apiArcTokenKey(tokenIn)
   const apiTokenOut = apiArcTokenKey(tokenOut, '')
   const amountIn = String(intent.amountIn || intent.amount || '')
-  const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   if (!amountIn) throw new Error('Swap quote needs amountIn.')
   if (!ARC_TOKENS[tokenIn]) throw new Error(`Unsupported swap input token: ${tokenIn}`)
   if (!ARC_TOKENS[tokenOut]) throw new Error(`Unsupported swap output token: ${tokenOut}`)
@@ -3468,10 +3565,11 @@ export async function quoteSwap(intent) {
 export async function executeConfirmedBridge(intent) {
   if (intent.confirmed !== true) return quoteBridge(intent)
   if (intent.mcpPreviewVerified !== true) throw new Error('MCP preview verification required before bridge execution.')
+  const source = executionSource(intent)
+  if (source === 'msca') assertMscaUnsupported('bridge')
   const fromChain = normalizeChainName(intent.fromChain) || intent.fromChain
   const toChain = normalizeChainName(intent.toChain) || intent.toChain
   const { account } = wallet()
-  const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   let prepareTx = ''
   let prepareExplorer = ''
   if (source === 'circle') {
@@ -3519,8 +3617,9 @@ export async function executeConfirmedBridge(intent) {
 export async function executeConfirmedSend(intent) {
   if (intent.confirmed !== true) return quoteSend(intent)
   if (intent.mcpPreviewVerified !== true) throw new Error('MCP preview verification required before send execution.')
+  const source = executionSource(intent)
+  if (source === 'msca') return executeMscaSend({ ...intent, source: 'msca' })
   const { account } = wallet()
-  const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   let result
   if (source === 'circle') {
     const tokenKey = normalizeArcTokenKey(intent.token)
@@ -3568,8 +3667,9 @@ export async function executeConfirmedSend(intent) {
 export async function executeConfirmedSwap(intent) {
   if (intent.confirmed !== true) return quoteSwap(intent)
   if (intent.mcpPreviewVerified !== true) throw new Error('MCP preview verification required before swap execution.')
+  const source = executionSource(intent)
+  if (source === 'msca') assertMscaUnsupported('swap')
   const { account } = wallet()
-  const source = String(intent.source || intent.walletSource || 'eoa').toLowerCase() === 'circle' ? 'circle' : 'eoa'
   const result = await executeSwap({
     ...intent,
     amount: String(intent.amountIn || intent.amount),

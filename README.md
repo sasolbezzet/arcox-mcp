@@ -25,6 +25,7 @@ ARCOX MCP follows the Circle for Agents direction: USDC-native agent workflows, 
 
 - EOA agent wallet swap/send/bridge/payment using the user's local `AGENT_PRIVATE_KEY`.
 - Circle proxy wallet support only when a tool is explicitly called with `source="circle"`.
+- Remote Hermes/Claude MCP OAuth binds the authenticated MCP identity to the active MSCA; remote MSCA sends use `source="session"`.
 - ARCOX Pay invoice/payment request tools for public USDC payment links on Arc Testnet.
 - x402 real testnet Arc USDC memo payments for ARCOX Intel.
 
@@ -111,17 +112,44 @@ Example config shape:
 
 ### Hermes
 
-```bash
-hermes mcp add arcox -- arcox-mcp
-```
-
-If Hermes uses a profile config, make sure `args` is an array, not a string:
+For MSCA transactions, configure Hermes as a remote MCP client, the same way as Claude Code. Do not configure an MSCA session token or private key in Hermes environment variables:
 
 ```yaml
 mcp_servers:
   arcox:
-    command: arcox-mcp
-    args: []
+    url: "https://arcoxdex.vercel.app/mcp"
+    auth: oauth
+```
+
+On first connection, Hermes opens the ARCOX OAuth flow. Complete the browser flow with the same wallet, select or activate the Agent Wallet (MSCA), and approve access with Passkey. Hermes then caches the OAuth MCP token locally with restricted permissions, like other remote OAuth MCP servers.
+
+Hermes supports two device-binding modes with the same remote OAuth MCP server:
+
+Same-device binding (browser + Passkey on the same computer as Hermes):
+
+```yaml
+mcp_servers:
+  arcox:
+    url: "https://arcoxdex.vercel.app/mcp"
+    auth: oauth
+    oauth:
+      redirect_host: localhost
+```
+
+Cross-device binding (Passkey on mobile, Hermes on a different computer):
+
+1. Run `hermes mcp login arcox` on the Hermes machine.
+2. Open the printed authorize URL in the mobile browser.
+3. Complete ARCOX login, select/activate the Agent Wallet (MSCA), and approve MCP with Passkey.
+4. The mobile browser will try to redirect to a localhost URL on the Hermes machine and fail — copy that final redirect URL.
+5. Paste the redirect URL into the Hermes prompt when it asks for it.
+
+No public domain, Cloudflare/ngrok tunnel, or SSH port-forward is required. No `ARCOX_MSCA_SESSION_TOKEN` is used in either mode.
+
+The local stdio package remains available for local EOA/SCA operation:
+
+```bash
+hermes mcp add arcox -- arcox-mcp
 ```
 
 ## Safe Execution Flow
@@ -147,6 +175,8 @@ Identity and jobs:
 
 Agent Jobs require an owned active Arc ERC-8004 identity. `create_agent_job` uses preview and explicit confirmation, then attaches an Arc Transaction Memo to the ERC-8183 call.
 
+- `arcox_wallet_modes`
+- `arcox_msca_status`
 - `arcox_wallet_balances`
 - `arcox_transaction_history`
 - `arcox_quote_swap`

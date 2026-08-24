@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve, relative } from 'node:path'
 import { homedir } from 'node:os'
+import { normalizeWalletSource, WALLET_SOURCES, walletSourceDescription } from './walletModes.mjs'
 import { actions, ARCOX_API_URL, ARCOX_WEB_URL, chainSupport, pages, retailRules } from './registry.mjs'
 import {
   agentStatus,
@@ -60,6 +61,7 @@ import {
   transactionHistory,
   depositUnifiedBalance,
   walletBalances,
+  mscaStatus,
   x402InvoiceStatus,
   x402PayInvoice,
 } from '../bin/arcox-agent.mjs'
@@ -290,6 +292,16 @@ const tools = [
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    name: 'arcox_wallet_modes',
+    description: 'Describe supported transaction wallet sources: eoa, sca/circle, and msca session-key wallet.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'arcox_msca_status',
+    description: 'Read the active authenticated MSCA session status without exposing private keys.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'get_ai_router_status',
     description: 'Get ARCOX AI Router status for ownerAddress or the configured local signer by default.',
     inputSchema: {
@@ -455,7 +467,7 @@ const tools = [
         toChain: { type: 'string' },
         amount: { type: 'string' },
         token: { type: 'string', default: 'USDC' },
-        source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
+        source: { type: 'string', enum: ['eoa', 'sca', 'circle', 'msca'], default: 'eoa', description: 'Wallet source: eoa, sca/circle, or authenticated msca.' },
       },
       required: ['fromChain', 'toChain', 'amount'],
       additionalProperties: false,
@@ -471,7 +483,7 @@ const tools = [
         toChain: { type: 'string' },
         amount: { type: 'string' },
         token: { type: 'string', default: 'USDC' },
-        source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
+        source: { type: 'string', enum: ['eoa', 'sca', 'circle', 'msca'], default: 'eoa', description: 'Wallet source: eoa, sca/circle, or authenticated msca.' },
         previewId: { type: 'string' },
         confirmationText: { type: 'string' },
         confirmed: { type: 'boolean' },
@@ -489,7 +501,7 @@ const tools = [
         to: { type: 'string' },
         amount: { type: 'string' },
         token: { type: 'string', default: 'USDC' },
-        source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
+        source: { type: 'string', enum: ['eoa', 'sca', 'circle', 'msca'], default: 'eoa', description: 'Wallet source: eoa, sca/circle, or authenticated msca.' },
       },
       required: ['to', 'amount'],
       additionalProperties: false,
@@ -504,7 +516,7 @@ const tools = [
         to: { type: 'string' },
         amount: { type: 'string' },
         token: { type: 'string', default: 'USDC' },
-        source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
+        source: { type: 'string', enum: ['eoa', 'sca', 'circle', 'msca'], default: 'eoa', description: 'Wallet source: eoa, sca/circle, or authenticated msca.' },
         previewId: { type: 'string' },
         confirmationText: { type: 'string' },
         confirmed: { type: 'boolean' },
@@ -776,7 +788,7 @@ const tools = [
         tokenIn: { type: 'string' },
         tokenOut: { type: 'string' },
         amountIn: { type: 'string', description: 'Exact human-readable decimal amount from the user. Example: "1" means exactly 1 token. Never convert this value to base units.' },
-        source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
+        source: { type: 'string', enum: ['eoa', 'sca', 'circle', 'msca'], default: 'eoa', description: 'Wallet source: eoa, sca/circle, or authenticated msca.' },
       },
       required: ['tokenIn', 'tokenOut', 'amountIn'],
       additionalProperties: false,
@@ -791,7 +803,7 @@ const tools = [
         tokenIn: { type: 'string' },
         tokenOut: { type: 'string' },
         amountIn: { type: 'string', description: 'Exact human-readable decimal amount copied from the confirmed preview. Example: "1" means exactly 1 token. Never convert this value to base units.' },
-        source: { type: 'string', enum: ['eoa', 'circle'], default: 'eoa' },
+        source: { type: 'string', enum: ['eoa', 'sca', 'circle', 'msca'], default: 'eoa', description: 'Wallet source: eoa, sca/circle, or authenticated msca.' },
         previewId: { type: 'string' },
         confirmed: { type: 'boolean' },
         confirmationText: { type: 'string', enum: ['yes', 'ya'], description: 'Copy the user immediate explicit yes/ya reply after showing the swap preview.' },
@@ -1080,9 +1092,8 @@ function canonicalToken(value, fallback = 'USDC') {
 }
 
 function canonicalSource(value, fallback = 'eoa') {
-  const raw = String(value || fallback).trim().toLowerCase()
-  if (raw.includes('circle') || raw.includes('proxy')) return 'circle'
-  return 'eoa'
+  const normalized = normalizeWalletSource(value, fallback)
+  return normalized === 'sca' ? 'sca' : normalized
 }
 
 function canonicalPreviewAction(name) {
@@ -1192,7 +1203,17 @@ function attachPreview(name, args, quote) {
   const hash = createHash('sha256').update(stableJson(canonical)).digest('hex')
   const previewId = `arcox-preview-${hash.slice(0, 16)}`
   const action = canonicalPreviewAction(name)
-  previewApprovals.set(previewId, { hash, canonical, action, createdAt: Date.now(), expiresAt: Date.now() + PREVIEW_TTL_MS })
+  previewApprovals.set(previewId, {
+    hash,
+    canonical,
+    action,
+    // The backend MSCA route has its own approval preview. Keep that opaque
+    // backend id bound to this local MCP preview so an agent cannot mix
+    // previews between wallet sessions.
+    backendPreviewId: quote?.source === 'msca-session' ? String(quote?.previewId || '') : '',
+    createdAt: Date.now(),
+    expiresAt: Date.now() + PREVIEW_TTL_MS,
+  })
   savePreviewApprovals()
   return {
     ...quote,
@@ -1253,6 +1274,7 @@ function enforcePreview(name, args) {
   if (!isSimpleUserConfirmation(args.confirmationText)) {
     throw new Error('HARD_BLOCK_USER_CONFIRMATION_REQUIRED: value-moving execution requires an explicit user reply of exactly "yes" or "ya" after the preview. Do not execute from agent inference, "ok", "lanjut", or missing confirmationText.')
   }
+  if (preview.backendPreviewId) args.backendPreviewId = preview.backendPreviewId
   previewApprovals.delete(previewId)
   savePreviewApprovals()
 }
@@ -1271,6 +1293,7 @@ function loadPreviewApprovals() {
         action: entry.action,
         createdAt: Number(entry.createdAt || now),
         expiresAt: Number(entry.expiresAt),
+        backendPreviewId: String(entry.backendPreviewId || ''),
       })
     }
   } catch {}
@@ -1359,6 +1382,12 @@ async function rpcResponse(message) {
     if (name === 'arcox_route_status') return result(id, routeStatus(args))
     if (name === 'arcox_agent_status') return result(id, await agentStatus())
     if (name === 'arcox_wallet_balances') return result(id, await walletBalances())
+    if (name === 'arcox_wallet_modes') return result(id, {
+      sources: WALLET_SOURCES.map(source => ({ source, description: walletSourceDescription(source), supportedActions: source === 'msca' ? ['send'] : ['send', 'swap', 'bridge'] })),
+      defaults: { localRuntime: 'eoa', explicitAliases: { sca: 'circle', circle: 'circle', msca: 'msca' } },
+      safety: 'Every value-moving action requires quote, exact previewId, and explicit confirmationText=yes/ya.',
+    })
+    if (name === 'arcox_msca_status') return result(id, await mscaStatus())
     if (name === 'get_ai_router_status') return result(id, await getAiRouterStatus(args))
     if (name === 'get_agent_identity') return result(id, await getAgentIdentity(args))
     if (name === 'list_agent_identities') return result(id, await listAgentIdentities(args))
@@ -1389,13 +1418,13 @@ async function rpcResponse(message) {
     if (name === 'list_ai_models') return result(id, await listAiModels(args))
     if (name === 'call_ai_model') return result(id, await callAiModel(args))
     if (name === 'get_usage_logs') return result(id, await getUsageLogs(args))
-    if (name === 'arcox_quote_bridge') return result(id, attachPreview(name, args, await quoteBridge(args)))
+    if (name === 'arcox_quote_bridge') return result(id, attachPreview(name, { ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa') }, await quoteBridge({ ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa') })))
     if (name === 'arcox_execute_bridge') {
       const fromChain = normalizeMcpChain(args.fromChain)
       const toChain = normalizeMcpChain(args.toChain)
       const fastSource = ['Arc_Testnet', 'Ethereum_Sepolia', 'Base_Sepolia', 'Arbitrum_Sepolia', 'HyperEVM_Testnet', 'Solana_Devnet'].includes(fromChain)
       if (args.confirmed !== true) {
-        const quoteArgs = { ...args, fromChain: fromChain || args.fromChain, toChain: toChain || args.toChain }
+        const quoteArgs = { ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa'), fromChain: fromChain || args.fromChain, toChain: toChain || args.toChain }
         return result(id, attachPreview('arcox_quote_bridge', quoteArgs, await quoteBridge(quoteArgs)))
       }
       enforcePreview(name, args)
@@ -1409,19 +1438,19 @@ async function rpcResponse(message) {
           maxAttestationWaitMs: args.maxAttestationWaitMs,
         })))
     }
-    if (name === 'arcox_quote_send') return result(id, attachPreview(name, args, await quoteSend(args)))
-    if (name === 'arcox_execute_send' && args.confirmed !== true) return result(id, attachPreview('arcox_quote_send', args, await quoteSend(args)))
+    if (name === 'arcox_quote_send') return result(id, attachPreview(name, args, await quoteSend({ ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa') })))
+    if (name === 'arcox_execute_send' && args.confirmed !== true) return result(id, attachPreview('arcox_quote_send', args, await quoteSend({ ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa') })))
     if (name === 'arcox_execute_send') {
       enforcePreview(name, args)
       enforceSpendLimits(name, args)
-      return result(id, await runValueMovingTool(name, args, () => executeConfirmedSend({ ...args, mcpPreviewVerified: true })))
+      return result(id, await runValueMovingTool(name, args, () => executeConfirmedSend({ ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa'), mcpPreviewVerified: true })))
     }
-    if (name === 'arcox_quote_swap') return result(id, attachPreview(name, args, await quoteSwap(args)))
-    if (name === 'arcox_execute_swap' && args.confirmed !== true) return result(id, attachPreview('arcox_quote_swap', args, await quoteSwap(args)))
+    if (name === 'arcox_quote_swap') return result(id, attachPreview(name, { ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa') }, await quoteSwap({ ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa') })))
+    if (name === 'arcox_execute_swap' && args.confirmed !== true) return result(id, attachPreview('arcox_quote_swap', { ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa') }, await quoteSwap({ ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa') })))
     if (name === 'arcox_execute_swap') {
       enforcePreview(name, args)
       enforceSpendLimits(name, args)
-      return result(id, await runValueMovingTool(name, args, () => executeConfirmedSwap({ ...args, mcpPreviewVerified: true })))
+      return result(id, await runValueMovingTool(name, args, () => executeConfirmedSwap({ ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa'), mcpPreviewVerified: true })))
     }
     if (name === 'arcox_transaction_history') return result(id, await transactionHistory())
     if (name === 'arcox_create_payment_request') return result(id, await createPaymentRequest(args))

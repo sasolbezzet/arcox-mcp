@@ -9,6 +9,26 @@ cd ~/.arcox
 arcox-mcp
 ```
 
+For Hermes-style MSCA execution, prefer the hosted MCP OAuth connection instead of local stdio:
+
+```yaml
+mcp_servers:
+  arcox:
+    url: "https://arcoxdex.vercel.app/mcp"
+    auth: oauth
+```
+
+Same-device binding (browser + Passkey on the same computer as Hermes):
+
+```yaml
+oauth:
+  redirect_host: localhost
+```
+
+Cross-device binding (Passkey on mobile, Hermes on another computer): run `hermes mcp login arcox`, open the authorize URL on mobile, complete ARCOX Passkey, copy the final redirect URL, and paste it into the Hermes prompt.
+
+The hosted flow is the same connection model used by Claude: Hermes handles OAuth/PKCE, the user completes the ARCOX browser Passkey flow, and the backend binds the MCP session to the active Agent Wallet (MSCA). No `ARCOX_MSCA_SESSION_TOKEN` is needed in Hermes env.
+
 Example MCP config:
 
 ```json
@@ -66,6 +86,7 @@ Execution safety:
 - Value-moving tools must be called first as quote/preview.
 - Execute tools only submit transactions when `confirmed: true`, a valid `previewId` is supplied, and the user confirmation text is exactly `yes` or `ya`.
 - EOA execution uses the configured local signer from the protected central env; secret values are never returned.
+- The hosted OAuth MCP path uses `source="session"` for MSCA execution; the local runtime's `source="msca"` compatibility path is optional and requires an explicitly configured local session.
 - Circle proxy wallet actions use the ARCOX backend auth session signed by the local agent key and must be explicitly requested with `source="circle"`.
 - ARCOX Intel x402 uses internal invoices and Arc transaction memos for payment reconciliation. MCP pays after preview/confirmation, polls status, and never asks users to submit a txHash manually.
 - Browser-wallet signing from the Web UI remains separate from terminal/MCP execution.
