@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.58
+
+- `hermes mcp login arcox` now shows an interactive two-option picker: device code (any device, no tunnel/paste) or same-device loopback. The choice applies per-run; `oauth.device_flow` in config remains the default.
+
 ## 0.1.57
 
 - Document ARCOX RFC 8628 device-code pairing for Hermes: `hermes mcp login arcox` prints a short code (`ARCX-XXX-XXX`) that users approve on any device at the ARCOX verification page — no paste-back, SSH tunnel, or domain needed.

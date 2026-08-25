@@ -43,9 +43,20 @@ Akses MCP arcox **tidak bisa dilakukan tanpa login**. Saat pertama kali mencoba 
 hermes mcp login arcox
 ```
 
-Hermes mendukung **dua metode koneksi**. Pilih lewat `oauth.device_flow` di config:
+Hermes menampilkan **menu pilihan metode koneksi**:
 
-### Metode A — Device code (default, untuk perangkat apa pun)
+```text
+  Pilih metode koneksi untuk 'arcox':
+
+    1) Device code  — approve di URL dari perangkat mana pun (mobile/laptop), tanpa paste/tunnel
+    2) Same-device   — Hermes + browser di komputer yang sama (loopback localhost)
+
+  Pilihan [1]:
+```
+
+Pilih **1** atau **2** lalu Enter. Pilihan ini berlaku untuk sesi login itu saja; `oauth.device_flow` di config tetap menjadi default.
+
+### Metode 1 — Device code (default, untuk perangkat apa pun)
 
 Server ARCOX mengiklankan RFC 8628 `device_authorization_endpoint`, jadi Hermes memakai device flow:
 
@@ -64,9 +75,9 @@ Waiting for approval...
 3. Login wallet + Passkey, lalu tekan **Setujui dengan Passkey**.
 4. Terminal otomatis lanjut: `Login successful.` — tanpa paste URL, tanpa tunnel, tanpa domain.
 
-### Metode B — Same-device loopback (Hermes + browser di 1 komputer)
+### Metode 2 — Same-device loopback (Hermes + browser di 1 komputer)
 
-Set `device_flow: local` di config, lalu jalankan `hermes mcp login arcox`. Hermes memakai callback `localhost`:
+Pilih **2** di menu (atau set `device_flow: local` di config). Hermes memakai callback `localhost`:
 
 1. Hermes membuka authorize URL di browser komputer yang sama.
 2. Login ARCOX dengan wallet + Passkey.
