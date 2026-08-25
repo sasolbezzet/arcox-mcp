@@ -23,6 +23,13 @@ mcp_servers:
   arcox:
     url: https://arcoxdex.vercel.app/mcp
     auth: oauth
+    oauth:
+      # device_flow memilih metode pairing untuk `hermes mcp login arcox`:
+      #   auto   (default) - device code page di perangkat mana pun
+      #   local  - same-device loopback (Hermes + browser di komputer yang sama)
+      #   device - paksa device code flow
+      device_flow: auto
+      redirect_host: localhost
     enabled: true
 ```
 
@@ -36,34 +43,38 @@ Akses MCP arcox **tidak bisa dilakukan tanpa login**. Saat pertama kali mencoba 
 hermes mcp login arcox
 ```
 
-Hermes akan mencetak authorize URL:
+Hermes mendukung **dua metode koneksi**. Pilih lewat `oauth.device_flow` di config:
+
+### Metode A — Device code (default, untuk perangkat apa pun)
+
+Server ARCOX mengiklankan RFC 8628 `device_authorization_endpoint`, jadi Hermes memakai device flow:
 
 ```text
-MCP OAuth: authorization required.
-Open this URL in your browser:
-  https://arcoxdex.vercel.app/api/auth/authorize?...
+MCP OAuth (device flow) for 'arcox'.
+Open this URL on any device, sign in, and approve the code:
+
+  https://arcoxdex.vercel.app/arc-dex/plugin?auth=device&user_code=ARCX-XXX-XXX
+
+Device code: ARCX-XXX-XXX
+Waiting for approval...
 ```
 
-## 4. Selesaikan browser flow
+1. Buka URL tersebut di browser mana pun (mobile/laptop).
+2. Kode sudah terisi otomatis lewat link; jika tidak, ketik kode dari terminal.
+3. Login wallet + Passkey, lalu tekan **Setujui dengan Passkey**.
+4. Terminal otomatis lanjut: `Login successful.` — tanpa paste URL, tanpa tunnel, tanpa domain.
 
-Buka URL itu di browser:
+### Metode B — Same-device loopback (Hermes + browser di 1 komputer)
 
-1. Login ke ARCOX dengan wallet.
-2. Sign pesan SIWE.
-3. Pilih atau aktifkan Agent Wallet (MSCA) di menu Plugin.
-4. Selesaikan autentikasi Passkey (fingerprint/Face ID/Windows Hello/security key).
-5. Setujui akses MCP untuk Hermes.
-6. Browser redirect kembali ke Hermes.
+Set `device_flow: local` di config, lalu jalankan `hermes mcp login arcox`. Hermes memakai callback `localhost`:
 
-### Same-device (browser di komputer yang sama)
+1. Hermes membuka authorize URL di browser komputer yang sama.
+2. Login ARCOX dengan wallet + Passkey.
+3. Browser redirect ke `localhost` dan Hermes menerima token otomatis.
 
-Callback otomatis ke `localhost`. Hermes menerima token langsung.
+Metode ini cocok saat Hermes dan browser berada di komputer yang sama.
 
-### Cross-device (Passkey di mobile, Hermes di komputer lain)
-
-Setelah authorize, browser mobile akan mencoba redirect ke `localhost` komputer Hermes dan gagal. Salin URL redirect akhir dari address bar mobile, lalu paste ke terminal Hermes.
-
-## 5. Verifikasi koneksi
+## 4. Verifikasi koneksi
 
 ```bash
 hermes mcp test arcox
@@ -77,7 +88,7 @@ Auth: OAuth 2.1 PKCE
 Connection successful
 ```
 
-## 6. Mulai menggunakan MCP
+## 5. Mulai menggunakan MCP
 
 Di chat Hermes:
 

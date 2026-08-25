@@ -123,9 +123,9 @@ mcp_servers:
 
 On first connection, Hermes opens the ARCOX OAuth flow. Complete the browser flow with the same wallet, select or activate the Agent Wallet (MSCA), and approve access with Passkey. Hermes then caches the OAuth MCP token locally with restricted permissions, like other remote OAuth MCP servers.
 
-Hermes supports two device-binding modes with the same remote OAuth MCP server:
+Hermes supports **two connection methods** for `hermes mcp login arcox`, selected with `oauth.device_flow`:
 
-Same-device binding (browser + Passkey on the same computer as Hermes):
+**Method A — Device code (default, any device, no tunnel/paste):**
 
 ```yaml
 mcp_servers:
@@ -133,16 +133,24 @@ mcp_servers:
     url: "https://arcoxdex.vercel.app/mcp"
     auth: oauth
     oauth:
+      device_flow: auto   # or "device" to force it
+```
+
+ARCOX advertises an RFC 8628 `device_authorization_endpoint`, so Hermes prints a short code (`ARCX-XXX-XXX`) and a verification URL. Open the URL on any device (mobile or laptop), approve with the same wallet + Passkey, and Hermes finishes automatically — no paste-back, no SSH tunnel, no domain.
+
+**Method B — Same-device loopback (Hermes + browser on one computer):**
+
+```yaml
+mcp_servers:
+  arcox:
+    url: "https://arcoxdex.vercel.app/mcp"
+    auth: oauth
+    oauth:
+      device_flow: local
       redirect_host: localhost
 ```
 
-Cross-device binding (Passkey on mobile, Hermes on a different computer):
-
-1. Run `hermes mcp login arcox` on the Hermes machine.
-2. Open the printed authorize URL in the mobile browser.
-3. Complete ARCOX login, select/activate the Agent Wallet (MSCA), and approve MCP with Passkey.
-4. The mobile browser will try to redirect to a localhost URL on the Hermes machine and fail — copy that final redirect URL.
-5. Paste the redirect URL into the Hermes prompt when it asks for it.
+Hermes opens the authorize URL in the local browser, you approve with Passkey, and the `localhost` callback completes automatically.
 
 No public domain, Cloudflare/ngrok tunnel, or SSH port-forward is required. No `ARCOX_MSCA_SESSION_TOKEN` is used in either mode.
 

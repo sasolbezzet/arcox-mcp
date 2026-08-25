@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.57
+
+- Document ARCOX RFC 8628 device-code pairing for Hermes: `hermes mcp login arcox` prints a short code (`ARCX-XXX-XXX`) that users approve on any device at the ARCOX verification page — no paste-back, SSH tunnel, or domain needed.
+- Two Hermes connection methods via `oauth.device_flow`: `auto` (device code when the server advertises it) and `local` (same-device loopback on one computer).
+- Add `scripts/e2e-hermes-device-modes.py` to verify local/device/auto pairing modes against the backend.
+
 ## 0.1.56
 
 - Include `docs/hermes-onboarding.md` in the npm tarball so new users can read the install -> login -> transact flow after `npm install -g arcox-mcp`.
