@@ -12,49 +12,51 @@ The agent has two modes:
 - HTTP endpoint mode for the ARCOX DEX UI.
 - Onchain command mode for Arc testnet jobs.
 
-## Local-First Retail Agent
+## Agent Wallet connection (recommended)
 
-The retail agent is designed to run like a Codex CLI or Hermes CLI agent on the user's own computer.
+The recommended path is an owner-controlled Agent Wallet MSCA. One owner may have multiple agents, but each agent receives its own `agentKey = clientId|ownerId`, MSCA wallet, limits, activity scope, card links, and revoke state.
+
+1. Open the ARCOX DEX plugin and sign in with the owner wallet/passkey.
+2. Select the intended Agent Wallet and choose **Buat Token Koneksi**.
+3. Paste the generated message into that agent's own Hermes chat, or run the helper:
+
+```bash
+echo 'URL server: https://arcoxdex.vercel.app/mcp Token: arx_at_...' | arcox-agent connect
+arcox-agent doctor
+```
+
+4. The agent must run `hermes mcp test arcox`, confirm `tools/list` is successful, and start a new session.
+
+The connection token is scoped to one agent wallet. Never reuse Agent A's token for Agent B. Rotation invalidates the old connection token; revocation invalidates all OAuth tokens for that agent. The token is stored in the Hermes profile credential file, not the local ARCOX signer env.
+
+## Local legacy EOA agent (optional)
+
+The existing local signer path remains available for users who explicitly need it. It is not required for an MSCA connection and must never be copied to ARCOX DEX or sent to the backend.
 
 ```text
 User command
   -> local ARCOX agent CLI
-  -> .env private key on user's computer
+  -> optional EOA_PRIVATE_KEY on user's computer
   -> Arc RPC / supported chain RPC
   -> onchain transaction
-  -> ARCOX DEX reads status
 ```
-
-ARCOX DEX must not receive the user's private key. The CLI signs locally only after the user reviews a preview and adds `--yes`.
-
-Create the local env file:
 
 ```bash
-cp .env.example .env
+arcox-agent setup
+# Edit ~/.arcox/agent.env only if local EOA signing is intentionally needed:
+# EOA_PRIVATE_KEY=0xYOUR_LOCAL_AGENT_PRIVATE_KEY
+arcox-agent doctor
 ```
 
-Then edit `.env` locally:
+An empty `EOA_PRIVATE_KEY` is valid: no EOA wallet block is created, while the remote MSCA tools remain available. Local value-moving commands still require a preview and explicit `--yes`.
 
-```env
-AGENT_PRIVATE_KEY=0xYOUR_LOCAL_AGENT_PRIVATE_KEY
-AGENT_NAME=ARCOX Codex Retail Agent
-AGENT_PORT=8787
-ARC_RPC=https://rpc.testnet.arc.network  # or the Canteen RPC from `arc-canteen rpc-url` (keep it in local env only)
-ARCOX_API_URL=https://arcoxdex.vercel.app
-ARC_AGENT_ID=
-```
-
-Print the ARCOX agent identity:
+For a direct installation, the package is:
 
 ```bash
-npm run agent -- identity
+npm install -g arcox-agent
 ```
 
-Print UI connection instructions:
-
-```bash
-npm run agent -- connect
-```
+The helper accepts a complete plugin message, validates the token, probes `initialize` plus `tools/list`, and only then writes Hermes configuration. It never echoes the token.
 
 ## Start The Agent Endpoint
 
@@ -189,10 +191,11 @@ npm run agent -- serve --port 8787
 9. Run terminal complete command.
 10. Read the job again in UI or terminal.
 
-## Security
+## Per-agent security
 
-Never commit `AGENT_PRIVATE_KEY`.
-
-Use testnet-only keys for this flow. This agent is a local developer agent for Arc testnet experiments.
+- Never commit `EOA_PRIVATE_KEY`, MSCA tokens, connection tokens, PAN, or CVV.
+- The backend trusts `mscaWalletAddress` from the OAuth token, not a user-supplied wallet label.
+- Owner vault routes require the passkey/SIWE session; an MCP bearer cannot link cards, change limits, or revoke another agent.
+- Use testnet-only keys for local EOA experiments. The remote Agent Wallet path does not require a private key in Hermes.
 
 The hosted planner agent cannot approve, swap, bridge, send, submit, or complete using a user's wallet. It only creates structured intent. User-wallet actions must still be signed by the user in MetaMask or another wallet.

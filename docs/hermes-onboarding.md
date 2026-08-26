@@ -85,6 +85,34 @@ Pilih **2** di menu (atau set `device_flow: local` di config). Hermes memakai ca
 
 Metode ini cocok saat Hermes dan browser berada di komputer yang sama.
 
+## 3A. Hermes versi lama / mode header: Token Koneksi (disarankan untuk Hermes default)
+
+Jika Hermes Anda belum memiliki `hermes mcp login`, buka plugin ARCOX dengan wallet owner, pilih Agent Wallet yang ingin dipakai, lalu tekan **Buat Token Koneksi**. Salin satu pesan yang dibuat plugin dan tempel ke chat Hermes Anda sendiri.
+
+Agent harus:
+
+1. Memastikan token berformat `arx_at_...` dan URL menunjuk ke `/mcp`.
+2. Menambahkan server menggunakan CLI resmi Hermes (bukan menaruh token di `~/.arcox/agent.env`):
+
+```bash
+hermes mcp add arcox --url https://arcoxdex.vercel.app/mcp --auth header
+```
+
+Saat diminta, tempel token koneksi. Hermes menyimpannya di profile Hermes dengan permission terbatas.
+3. Menjalankan `hermes mcp test arcox` dan memastikan `tools/list` berhasil sebelum mengklaim terhubung.
+4. Memulai sesi Hermes baru agar tools masuk ke konteks model.
+
+Token koneksi terikat ke **satu** `agentKey` dan satu Agent Wallet MSCA. Jangan gunakan ulang token Agent A untuk Agent B. Rotasi di plugin mematikan token koneksi lama untuk agent yang sama; cabut agent mematikan seluruh access/refresh token-nya.
+
+Skrip helper `arcox-agent connect` juga menerima pesan plugin:
+
+```bash
+echo 'URL server: https://arcoxdex.vercel.app/mcp Token: arx_at_...' | arcox-agent connect
+arcox-agent doctor
+```
+
+`connect` mem-probe `initialize` dan `tools/list` terlebih dahulu, lalu menulis konfigurasi header. Token tidak dicetak oleh helper.
+
 ## 4. Verifikasi koneksi
 
 ```bash
@@ -121,6 +149,10 @@ Hermes akan:
 4. Call `arcox_execute_send` dengan `confirmed: true`.
 5. Backend execute UserOperation via session key MSCA.
 6. Return tx hash dan explorer URL.
+
+## 6. Isolasi agent
+
+Satu owner boleh memiliki banyak Agent Wallet, tetapi setiap agent memiliki satu pasangan `clientId + ownerId` dan satu MSCA. Nama agent, wallet, limit harian, audit activity, kartu tertaut, connection token, dan revoke state diproses dalam scope pasangan itu. Satu agent tidak dapat melihat activity atau menggunakan token agent lain.
 
 ## Security
 
