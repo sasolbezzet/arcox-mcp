@@ -18,12 +18,13 @@ The recommended path is an owner-controlled Agent Wallet MSCA. One owner may hav
 
 1. Open the ARCOX DEX plugin and sign in with the owner wallet/passkey.
 2. Select the intended Agent Wallet and choose **Buat Token Koneksi**.
-3. Paste the generated message into that agent's own Hermes chat, or run the helper:
+3. Run the generated command in the Hermes shell:
 
 ```bash
-echo 'URL server: https://arcoxdex.vercel.app/mcp Token: arx_at_...' | arcox-agent connect
-arcox-agent doctor
+printf '%s\\n' 'URL server: https://arcoxdex.vercel.app/mcp Token: arx_at_...' | npx --yes arcox-agent@0.1.20 connect
 ```
+
+The connector must verify `initialize`, `tools/list`, and `arcox_session_status` before it writes the Hermes profile. It prints the token-bound MSCA address and active status without echoing the token.
 
 4. The agent must run `hermes mcp test arcox`, confirm `tools/list` is successful, and start a new session.
 
@@ -56,7 +57,7 @@ For a direct installation, the package is:
 npm install -g arcox-agent
 ```
 
-The helper accepts a complete plugin message, validates the token, probes `initialize` plus `tools/list`, and only then writes Hermes configuration. It never echoes the token.
+The helper accepts a complete plugin message, validates the token, probes `initialize`, `tools/list`, and `arcox_session_status`, and only then writes Hermes configuration. It never echoes the token. Use the published `arcox-agent@0.1.20` connector; do not select an older local executable named `arcox-agent`.
 
 ## Start The Agent Endpoint
 

@@ -1,7 +1,7 @@
 {
   "name": "arcox-mcp",
   "private": false,
-  "version": "0.1.58",
+  "version": "0.1.59",
   "type": "module",
   "description": "ARCOX DEX MCP server and terminal agent with Hermes/Claude remote OAuth MSCA support, local EOA/SCA execution, and quote-before-execute safety for swap, bridge, send, ARCOX Pay invoices, balances, history, retry bridge, and agentic jobs.",
   "license": "MIT",
