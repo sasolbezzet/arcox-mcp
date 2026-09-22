@@ -1,118 +1,82 @@
 # ARCOX MCP
 
-ARCOX MCP is a local MCP server and terminal agent for ARCOX DEX retail flows.
+ARCOX MCP adalah MCP server + terminal agent untuk ARCOX DEX. Paket ini dipakai
+dua cara:
 
-For most end users, install `arcox-agent` instead of `arcox-mcp`. The `arcox-agent`
-package pulls `arcox-mcp` automatically and adds the guided `setup`, `sync`, and
-`doctor` flow for Hermes/Codex.
+1. **Remote MCP (cara yang direkomendasikan)** — agent (Grok, Claude, ChatGPT,
+   Hermes, Codex) terhubung ke `https://arcoxdex.vercel.app/mcp` memakai OAuth
+   atau connection token, dan bertransaksi dari **Agent Wallet (MSCA)** milik
+   user yang diotorisasi dengan passkey.
+2. **Local stdio MCP** — `arcox-mcp` sebagai proses lokal untuk operasi EOA/SCA
+   lokal (legacy path, tetap tersedia).
 
-It exposes tools for:
-
-- Wallet balances across EOA, Circle proxy wallet, and Solana Devnet
-- Swap quote and execution from the local EOA agent wallet by default, with optional Circle proxy wallet source
-- Bridge quote and execution, including native ETH to Arc on verified Ethereum/Base Sepolia routers
-- Send quote and execution
-- ARCOX Pay invoice/payment request tools
-- ARCOX Intel tools that call ARCOX API x402 endpoints; MCP never stores `ARKHAM_API_KEY` and never calls Arkham directly
-- Bridge retry and transaction history
-- ARCOX Agentic Economy job actions
-- ARCOX DEX UI/action map for agents
-- Dynamic-style ARCOX docs search/read tools
-
-## Circle Agents Alignment
-
-ARCOX MCP follows the Circle for Agents direction: USDC-native agent workflows, paid API readiness, and quote-before-execute safety. Current support is:
-
-- EOA agent wallet swap/send/bridge/payment using the user's local `AGENT_PRIVATE_KEY`.
-- Circle proxy wallet support only when a tool is explicitly called with `source="circle"`.
-- Remote Hermes/Claude MCP OAuth binds the authenticated MCP identity to the active MSCA; remote MSCA sends use `source="session"`.
-- ARCOX Pay invoice/payment request tools for public USDC payment links on Arc Testnet.
-- x402 real testnet Arc USDC memo payments for ARCOX Intel.
-
-ARCOX does not claim live gas-free nanopayments or private payments. Those remain future integration work.
+Untuk pengguna umum, install `arcox-agent`, bukan `arcox-mcp` langsung:
+`arcox-agent` menarik `arcox-mcp` otomatis dan menambahkan alur
+`setup`, `connect`, `sync`, `doctor` untuk Hermes/Codex.
 
 ## Install
 
 ```bash
-npm install -g arcox-mcp
+npm install -g arcox-mcp      # atau: npx arcox-mcp
 ```
 
-Or run without global install:
+Binary yang tersedia:
+
+```text
+arcox-mcp            server stdio MCP
+arcox                CLI low-level
+arcox-runtime-agent  wrapper runtime agent
+```
+
+## Remote MCP (MSCA, per-agent)
+
+```text
+URL  : https://arcoxdex.vercel.app/mcp
+Auth : OAuth 2.1 (DCR + PKCE S256) atau connection token dari halaman Plugin
+```
+
+Alur OAuth:
+
+1. Agent membuka halaman approval ARCOX (`/plugin?auth=mcp&request_id=...`).
+2. User menyelesaikan approval: pilih/aktifkan Agent Wallet lalu setujui
+   dengan **passkey** (dan SIWE hanya bila sesi owner belum ada).
+3. Agent menukar authorization code di `/api/auth/token` dan menyimpan token.
+4. Agent memanggil `tools/list` dan mulai bertransaksi.
+
+Satu agent = satu `clientId` = satu Agent Wallet dengan limit harian, scope
+audit, card link, dan status revoke sendiri. Jangan pakai ulang token milik
+agent lain.
+
+Hermes juga bisa memakai **connection token** (`arcox_conn_*`) yang dibuat dari
+kartu agent di halaman Plugin:
 
 ```bash
-npx arcox-mcp
+ARCOX_MCP_URL=https://arcoxdex.vercel.app/mcp arcox-agent connect --prompt-token
 ```
 
-Global `arcox-mcp` installation exposes:
+> Catatan: ARCOX **tidak** menyediakan device-code OAuth flow
+> (RFC 8628). Metadata OAuth hanya mengiklankan
+> `grant_types_supported: authorization_code, refresh_token` dan
+> `code_challenge_methods_supported: S256`.
 
-- `arcox-mcp` for the stdio MCP server
-- `arcox` for the low-level CLI
-- `arcox-runtime-agent` for the standalone runtime prompt wrapper
+### Kalau agent tidak menemukan tool
 
-It does not install the user-facing `arcox-agent` setup wrapper. That wrapper lives in
-the separate `arcox-agent` package and installs `arcox-mcp` automatically.
-
-## Environment
-
-Keep backend and user signing secrets in separate trust domains:
+Gejala "agent terhubung tetapi tidak bisa membaca tool ARCOX" hampir selalu
+berarti token belum pernah terbit (halaman approval belum selesai), bukan
+masalah daftar tool. Cek dari repo backend:
 
 ```bash
-chmod 600 ~/arc-dex-api/.env
-chmod 600 ~/.arcox/agent.env
+cd /home/ubuntu/arc-dex-api
+npm run diag:mcp -- --agent grok
 ```
 
-Optional safety limits:
+Skrip akan menampilkan: klien mana yang punya token aktif, klien mana yang
+belum pernah menukar kode, jumlah tool yang benar-benar diterima klien mode
+JSON maupun SSE, dan hasil `tools/call`.
 
-```bash
-ARCOX_MAX_TX_USDC=10
-ARCOX_DAILY_LIMIT_USDC=50
-ARCOX_MAX_TX_NATIVE=0.1
-```
-
-Native bridge examples:
-
-```bash
-bridge 0.001 ETH from Base Sepolia to Arc
-bridge 0.001 ETH from Ethereum Sepolia to Arc
-```
-
-Native bridge uses the local EOA agent wallet only. Circle Wallet source supports USDC bridge routes, not native ETH.
-
-The backend reads `~/arc-dex-api/.env`; the local agent reads `~/.arcox/agent.env`. The backend never receives the user wallet key, and secret values are never printed.
-
-```bash
-arcox-runtime-agent status
-```
-
-## MCP Config
-
-### Codex
-
-Add an MCP server entry that runs:
-
-```bash
-arcox-mcp
-```
-
-Example config shape:
-
-```json
-{
-  "mcpServers": {
-    "arcox": {
-      "command": "arcox-mcp",
-      "args": [],
-      "env": {
-        "ARCOX_MCP_DEBUG": "arcox-mcp.log"
-      }
-    }
-  }
-}
-```
+## Config agent
 
 ### Hermes
-
-For MSCA transactions, configure Hermes as a remote MCP client, the same way as Claude Code. Do not configure an MSCA session token or private key in Hermes environment variables:
 
 ```yaml
 mcp_servers:
@@ -121,160 +85,168 @@ mcp_servers:
     auth: oauth
 ```
 
-On first connection, Hermes opens the ARCOX OAuth flow. Complete the browser flow with the same wallet, select or activate the Agent Wallet (MSCA), and approve access with Passkey. Hermes then caches the OAuth MCP token locally with restricted permissions, like other remote OAuth MCP servers.
-
-Hermes supports **two connection methods** for `hermes mcp login arcox`. Running the command shows an interactive picker:
-
-```text
-  Pilih metode koneksi untuk 'arcox':
-    1) Device code  — approve di URL dari perangkat mana pun (mobile/laptop), tanpa paste/tunnel
-    2) Same-device   — Hermes + browser di komputer yang sama (loopback localhost)
-  Pilihan [1]:
-```
-
-**Method A — Device code (default, any device, no tunnel/paste):** pick `1` (or set `oauth.device_flow: auto` in config). ARCOX advertises an RFC 8628 `device_authorization_endpoint`, so Hermes prints a short code (`ARCX-XXX-XXX`) and a verification URL. Open the URL on any device (mobile or laptop), approve with the same wallet + Passkey, and Hermes finishes automatically — no paste-back, no SSH tunnel, no domain.
-
-**Method B — Same-device loopback (Hermes + browser on one computer):** pick `2` (or set `oauth.device_flow: local`). Hermes opens the authorize URL in the local browser, you approve with Passkey, and the `localhost` callback completes automatically.
-
-No public domain, Cloudflare/ngrok tunnel, or SSH port-forward is required. No `ARCOX_MSCA_SESSION_TOKEN` is used in either mode.
-
-The local stdio package remains available for local EOA/SCA operation:
+Atau dengan token koneksi:
 
 ```bash
-hermes mcp add arcox -- arcox-mcp
+hermes mcp add arcox --url https://arcoxdex.vercel.app/mcp --auth header
+hermes mcp test arcox
 ```
 
-## Safe Execution Flow
+### Codex / stdio lokal
 
-All value-moving tools require a quote/preview first:
+```json
+{
+  "mcpServers": {
+    "arcox": {
+      "command": "arcox-agent",
+      "args": ["mcp"]
+    }
+  }
+}
+```
 
-1. Call quote tool.
-2. Show preview to the user.
-3. User confirms with exactly `yes` or `ya`.
-4. Call execute tool with `confirmed=true`, the exact `previewId`, and `confirmationText`.
+## Tools (88 tool aktif)
 
-The agent must not skip the preview step.
-
-## Tools
-
-Identity and jobs:
-
-- `get_agent_identity`
-- `list_agent_identities`
-- `select_agent_identity`
-- `create_agent_job`
-- `list_agent_jobs`
-
-Agent Jobs require an owned active Arc ERC-8004 identity. `create_agent_job` uses preview and explicit confirmation, then attaches an Arc Transaction Memo to the ERC-8183 call.
-
-- `arcox_wallet_modes`
-- `arcox_msca_status`
-- `arcox_wallet_balances`
-- `arcox_transaction_history`
-- `arcox_quote_swap`
-- `arcox_execute_swap`
-- `arcox_quote_bridge`
-- `arcox_execute_bridge`
-- `arcox_quote_send`
-- `arcox_execute_send`
-- `arcox_create_payment_request`
-- `arcox_get_payment_request`
-- `arcox_quote_payment_request`
-- `arcox_pay_payment_request`
-- `arcox_check_payment_status`
-- `arcox_simulate_circle_webhook`
-- `arcox_quote_eco_route_payment`
-- `arcox_retry_bridge`
-- `arcox_route_status`
-- `arcox_ui_map`
-- `arcox_action_plan`
-- `arcox_search_docs`
-- `arcox_read_doc`
-- `arcox_agent_status`
-- `arcox_agent_job`
-- `get_ai_router_status`
-- `get_unified_balance`
-- `quote_unified_balance_deposit`
-- `deposit_unified_balance`
-- `quote_ai_router_auto_pay`
-- `set_ai_router_auto_pay`
-- `create_ai_api_key`
-- `delete_ai_api_key`
-- `list_ai_models`
-- `call_ai_model`
-- `get_usage_logs`
-
-ARCOX AI Router:
-
-- MCP can deposit testnet USDC to Unified Balance and enable/disable Auto Pay with preview and explicit confirmation.
-- Auto Pay setup covers each funded EVM source chain; delegated AI spends use only chains whose authorization is ready.
-- API keys use `arx_sk_...`; backend stores only hashes.
-- MCP can create a key after wallet authentication.
-- Hermes can use the `arx_sk_...` key directly with the production base URL.
-- Each request is paid from user Unified Balance through backend delegated spend.
-- Provider API keys are never stored in MCP; MCP only calls ARCOX API.
-
-OpenAI-compatible config:
+Wallet, swap, bridge, send:
 
 ```text
-base_url = https://arcoxdex.vercel.app/v1
-api_key = arx_sk_...
-model = arcox/auto
+arcox_wallet_balances              arcox_quote_swap / arcox_execute_swap
+arcox_transaction_history          arcox_quote_bridge / arcox_execute_bridge
+arcox_route_status                 arcox_bridge_status / arcox_retry_bridge_mint
+arcox_session_status               arcox_quote_send / arcox_execute_send
+arcox_mcp_info                     arcox_get_request
 ```
 
-The local proxy remains optional for MCP transaction tools; it is not required for AI model access.
+Vault:
 
-ARCOX Intel x402 service coverage:
+```text
+arcox_vault_list_credentials  arcox_vault_request_approval  arcox_vault_get_limits
+```
 
-- `arcox_intel_get_address` supports `service`: `basic`, `all`, `enriched`, `balances`, `counterparties`, `flows`, `history`, `volume`, `portfolio`.
-- `arcox_intel_get_tx` supports `service`: `basic`, `transfers`.
-- `arcox_intel_get_entity` supports `service`: `basic`, `summary`, `balances`, `flows`.
-- `arcox_intel_get_token` supports `service`: `basic`, `market`, `holders`, `top-flow`, `trending`, `top`, `contract`, `contract-holders`.
+ARCOX Intel (read-only, dibayar x402):
 
-ARCOX Intel x402 payments use Arc transaction memos. The agent pays USDC through the Arc Memo contract, attaching the invoice/payment reference on-chain for reconciliation.
+```text
+arcox_intel_get_address        arcox_intel_get_entity        arcox_intel_get_token
+arcox_intel_get_balances       arcox_intel_get_portfolio     arcox_intel_get_contract
+arcox_intel_get_tx             arcox_intel_search            arcox_intel_get_flows
+arcox_intel_get_history        arcox_intel_get_volume        arcox_intel_get_counterparties
+arcox_intel_get_risk           arcox_intel_get_loans         arcox_intel_get_network
+arcox_intel_get_solana_subaccounts  arcox_intel_get_transfers arcox_intel_get_global_transfers
+arcox_intel_get_swaps          arcox_intel_get_portfolio_series
+arcox_intel_get_market         arcox_intel_get_hypercore     arcox_intel_get_polymarket
+arcox_intel_quote_wallet_report  arcox_intel_execute_wallet_report
+arcox_x402_pay_invoice         arcox_x402_invoice_status
+```
 
-Reconciliation teknis:
+Pembayaran (ARCOX Pay):
 
-- Backend production memilih RPC Canteen dari environment lokal/server secara aman; RPC publik Arc tetap menjadi fallback. Agent membaca endpoint Canteen dari `arc-canteen`/`~/.arc-canteen/env` dan tidak menyimpan token di source atau frontend.
-- Scan `eth_getLogs` yang memakai Arc dibatasi ke chunk konservatif 2,000 block agar kompatibel dengan batas parameter dan ukuran respons Canteen.
-- Invoice yang `expired` tetap di-reconcile jika ada bukti on-chain. Pembayaran tidak hilang.
-- Agent polling otomatis menunggu sampai 40 detik setelah tx sukses. Jika invoice belum `paid`, gunakan `X-Payment-Id` header untuk retry manual.
+```text
+arcox_create_payment_request   arcox_get_payment_request   arcox_quote_payment_request
+arcox_pay_payment_request      arcox_check_payment_status  arcox_pay_get_payment_status
+arcox_pay_list_recent_payments
+```
 
-## Circle Gateway Nanopayments Readiness
+Cards:
 
-ARCOX MCP understands Arc x402 payments as:
+```text
+arcox_card_config   arcox_card_list_merchants   arcox_card_balance   arcox_card_fund
+arcox_card_create   arcox_card_list             arcox_card_spend     arcox_card_transactions
+arcox_card_refund_tx
+```
 
-1. API returns `402 Payment Required`.
-2. Agent previews exact Arc Testnet USDC amount, recipient, invoice, and memo ID.
-3. User confirms `yes`.
-4. Agent pays through Arc Memo contract and polls invoice status.
-5. Paid invoice unlocks the Arkham result through ARCOX API.
+Agentic economy (ERC-8004 / ERC-8183 di Arc):
 
-Do not tell users gas-free nanopayments are live. Unified Balance/Gateway are payment rails; current MCP execution uses public Arc Testnet USDC.
+```text
+arcox_agent_status             arcox_agentic_register_agent   arcox_agentic_get_agent
+arcox_agentic_create_job       arcox_agentic_get_job          arcox_agentic_set_budget
+arcox_agentic_fund_job         arcox_agentic_submit_deliverable
+arcox_agentic_complete_job     arcox_agentic_ask
+list_agent_identities          select_agent_identity
+list_agent_jobs                create_agent_job
+```
 
-## CLI Examples
+AI Router:
+
+```text
+get_ai_router_status   get_ai_router_api_keys   create_ai_api_key   revoke_ai_api_key
+list_ai_models         get_usage_logs           call_ai_model
+```
+
+Dokumentasi & katalog in-app:
+
+```text
+arcox_search_docs   arcox_read_doc   arcox_service_catalog   arcox_catalog
+arcox_execution_guide   arcox_ui_map   arcox_action_plan
+```
+
+## Alur eksekusi yang aman
+
+Semua tool yang memindahkan nilai memakai pola quote → preview → konfirmasi:
+
+1. Panggil tool quote (`arcox_quote_*`).
+2. Tampilkan preview (jumlah, token, chain, tujuan, fee) ke user.
+3. User menyetujui dengan tepat `ya`/`yes`.
+4. Panggil tool execute dengan `confirmed=true`, `previewId` yang sama, dan
+   `confirmationText` dari user.
+
+Agent tidak boleh melewati langkah preview. Sumber eksekusi agent remote adalah
+**Agent Session Key (MSCA)** — passkey-gated, gasless, dibatasi limit harian.
+
+## Interoperabilitas transport
+
+Server melayani beberapa gaya klien sekaligus:
+
+- Klien `Accept: application/json` saja → jawaban JSON (bukan SSE).
+- Klien `Accept: application/json, text/event-stream` (Claude/ChatGPT) → SSE.
+- Klien yang tidak mengirim `Mcp-Session-Id` → dilayani tanpa sesi.
+- Field tasks-extension `execution` tidak dikirim karena server tidak
+  mengiklankan capability `tasks`; klien dengan skema ketat gagal mem-parse
+  seluruh `tools/list` bila ada field asing.
+
+## x402 / pembayaran Intel
+
+1. Endpoint ARCOX mengembalikan `402 Payment Required`.
+2. Agent menampilkan jumlah USDC Arc Testnet yang tepat + invoice + memo ID.
+3. User menyetujui.
+4. Agent membayar lewat Arc Transaction Memo dan memantau status invoice.
+5. Invoice `paid` membuka hasil Arkham melalui ARCOX API.
+
+Unified Balance / Circle Gateway adalah rail pembayaran; eksekusi MCP saat ini
+memakai USDC Arc Testnet publik. Jangan menyatakan nanopayments gas-free sudah
+live.
+
+## CLI
 
 ```bash
 arcox-runtime-agent status
 arcox-runtime-agent "show all wallet balances"
-arcox-runtime-agent "quote swap 1 eurc to usdc from eoa"
 arcox-runtime-agent "quote bridge 1 usdc from arc to base"
-arcox-runtime-agent "send 1 eurc from eoa to 0x..."
 arcox-runtime-agent "create payment request 10 usdc to 0xMerchant for AI agent setup"
-arcox-runtime-agent "quote payment invoice inv_..."
-arcox-runtime-agent "retry bridge 0xBURN_TX from arbitrum sepolia to arc"
+arcox
 ```
 
-For execution, inspect the preview first and then confirm.
+## Environment
 
-ARCOX Pay invoice payment uses quote-before-execute. The execute call must pass the quoted `previewId` and the same invoice amount, token, and merchant address from `previewArgs`.
+```bash
+ARCOX_MAX_TX_USDC=10          # batas per transaksi
+ARCOX_DAILY_LIMIT_USDC=50     # batas harian
+ARCOX_MAX_TX_NATIVE=0.1       # batas native (bridge ETH)
+```
 
-Swap uses EOA by default. To use the Circle proxy wallet, the tool call must explicitly include `source="circle"` in both quote and execute.
+- Secret signer hanya di `~/.arcox/agent.env` (mode `600`); secret backend
+  hanya di `~/arc-dex-api/.env`. Jangan menyalin secret antar repo.
+- `arcox-runtime-agent status` melaporkan `envSecurityWarnings` bila env file
+  terbaca oleh group/other.
+- Jangan pernah menempelkan token koneksi/private key ke chat, argumen
+  perintah, log, atau konfigurasi aplikasi.
 
-## Security
+## Testing
 
-- User signing secrets exist only in `~/.arcox/agent.env`; backend/provider secrets remain in `~/arc-dex-api/.env`. Both use permission `600`.
-- ARCOX DEX web UI does not receive the private key.
-- MCP execution is local to the user's agent process.
-- `arcox-runtime-agent status` reports `envSecurityWarnings` when the `.env` file is readable by group/other users.
-- Never paste signing secrets into chat, command arguments, logs, or application configuration.
+```bash
+npm test        # check + node --test test/*.test.mjs
+```
+
+Alur OAuth/MSCA end-to-end diuji dari repo backend:
+`npm run test:e2e:flows` (passkey + EOA virtual, UserOperation nyata di Arc
+testnet), `npm run test:e2e:ui` (menu Plugin di Chrome nyata), dan
+`npm run diag:mcp` untuk diagnosa konektor.
