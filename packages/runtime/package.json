@@ -14,6 +14,8 @@
     "compile:router": "node scripts/compile-router.mjs",
     "deploy:router": "node scripts/deploy-router.mjs",
     "deploy:solana-router": "node scripts/deploy-solana-router.mjs",
-    "verify:router": "node scripts/verify-router.mjs"
+    "verify:router": "node scripts/verify-router.mjs",
+    "mainnet:sources": "node scripts/fetch-verified-sources.mjs",
+    "mainnet:plan": "node scripts/plan-mainnet-deploy.mjs"
   }
 }

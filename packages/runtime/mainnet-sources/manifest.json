@@ -1,0 +1,604 @@
+{
+  "fetchedAt": "2026-09-25T04:47:24.625Z",
+  "sourceApi": "https://testnet.arcscan.app/api/v2",
+  "note": "Source terverifikasi dari ArcScan (Arc testnet) untuk redeploy ke Arc mainnet. Testnet-only snapshot.",
+  "contracts": [
+    {
+      "label": "ArcoxRouter",
+      "name": "ARCOX Fee Router",
+      "address": "0xDf800310443BEB589CEf91A09854203Ea36e43a7",
+      "kind": "direct",
+      "envOut": "ARCOX_FEE_ROUTER_ADDRESS",
+      "status": "verified",
+      "contractName": "ArcoxRouter",
+      "compilerVersion": "0.8.35+commit.47b9dedd",
+      "compilerSettings": {
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        }
+      },
+      "optimization": {
+        "enabled": true,
+        "runs": 200
+      },
+      "evmVersion": "default",
+      "license": "none",
+      "filePath": "ArcoxRouter.sol",
+      "sourceFile": "ArcoxRouter/ArcoxRouter.sol",
+      "constructorArgsHex": "0x000000000000000000000000e34ff1d2c925ddafb28c95c2396fc49a6f64569e000000000000000000000000e34ff1d2c925ddafb28c95c2396fc49a6f64569e00000000000000000000000036000000000000000000000000000000000000000000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001e",
+      "constructorArgsDecoded": [
+        [
+          "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+          {
+            "internalType": "address",
+            "name": "initialOwner",
+            "type": "address"
+          }
+        ],
+        [
+          "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+          {
+            "internalType": "address",
+            "name": "initialTreasury",
+            "type": "address"
+          }
+        ],
+        [
+          "0x3600000000000000000000000000000000000000",
+          {
+            "internalType": "address",
+            "name": "usdc_",
+            "type": "address"
+          }
+        ],
+        [
+          "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+          {
+            "internalType": "address",
+            "name": "tokenMessenger_",
+            "type": "address"
+          }
+        ],
+        [
+          "26",
+          {
+            "internalType": "uint32",
+            "name": "localDomain_",
+            "type": "uint32"
+          }
+        ],
+        [
+          "30",
+          {
+            "internalType": "uint16",
+            "name": "feeBps_",
+            "type": "uint16"
+          }
+        ]
+      ],
+      "proxyType": null,
+      "implementations": [],
+      "verifiedAt": "2026-06-06T15:21:58.112159Z",
+      "sourcifyRepoUrl": null,
+      "additionalSourceCount": 0
+    },
+    {
+      "label": "ArcoxCirBTCRouterV2",
+      "name": "AMM Router (USDC↔cirBTC)",
+      "address": "0x9f2443691bddd8343590c68e2a2cdec5fd0b6124",
+      "kind": "direct",
+      "envOut": "ARCOX_AMM_ROUTER",
+      "status": "verified",
+      "contractName": "ArcoxCirBTCRouterV2",
+      "compilerVersion": "0.8.24+commit.e11b9ed9",
+      "compilerSettings": {
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        }
+      },
+      "optimization": {
+        "enabled": true,
+        "runs": 200
+      },
+      "evmVersion": "default",
+      "license": "none",
+      "filePath": "ArcoxCirBTCRouterV2.sol",
+      "sourceFile": "ArcoxCirBTCRouterV2/ArcoxCirBTCRouterV2.sol",
+      "constructorArgsHex": "0x000000000000000000000000e34ff1d2c925ddafb28c95c2396fc49a6f64569e000000000000000000000000360000000000000000000000000000000000000000000000000000000000000089b50855aa3be2f677cd6303cec089b5f319d72a000000000000000000000000f0c4a4ce82a5746abaad9425360ab04fbba432bf",
+      "constructorArgsDecoded": [
+        [
+          "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+          {
+            "internalType": "address",
+            "name": "_treasury",
+            "type": "address"
+          }
+        ],
+        [
+          "0x3600000000000000000000000000000000000000",
+          {
+            "internalType": "address",
+            "name": "_usdc",
+            "type": "address"
+          }
+        ],
+        [
+          "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+          {
+            "internalType": "address",
+            "name": "_eurc",
+            "type": "address"
+          }
+        ],
+        [
+          "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+          {
+            "internalType": "address",
+            "name": "_cirbtc",
+            "type": "address"
+          }
+        ]
+      ],
+      "proxyType": null,
+      "implementations": [],
+      "verifiedAt": "2026-07-28T11:28:33.758773Z",
+      "sourcifyRepoUrl": null,
+      "additionalSourceCount": 0
+    },
+    {
+      "label": "ArcoxCirBTCRouter",
+      "name": "AMM Router (varian registry)",
+      "address": "0x0c72563b9846df4355244a9671918e59c620c580",
+      "kind": "direct",
+      "envOut": null,
+      "status": "verified",
+      "contractName": "ArcoxCirBTCRouter",
+      "compilerVersion": "v0.8.24+commit.e11b9ed9",
+      "compilerSettings": {
+        "libraries": {},
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        },
+        "outputSelection": {
+          "*": {
+            "": [
+              "*"
+            ],
+            "*": [
+              "*"
+            ]
+          }
+        }
+      },
+      "optimization": {
+        "enabled": true,
+        "runs": 200
+      },
+      "evmVersion": "default",
+      "license": "none",
+      "filePath": "ArcoxCirBTCRouter.sol",
+      "sourceFile": "ArcoxCirBTCRouter/ArcoxCirBTCRouter.sol",
+      "constructorArgsHex": "0x000000000000000000000000e34ff1d2c925ddafb28c95c2396fc49a6f64569e",
+      "constructorArgsDecoded": [
+        [
+          "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+          {
+            "internalType": "address",
+            "name": "_treasury",
+            "type": "address"
+          }
+        ]
+      ],
+      "proxyType": null,
+      "implementations": [],
+      "verifiedAt": "2026-07-25T00:19:59.779521Z",
+      "sourcifyRepoUrl": null,
+      "additionalSourceCount": 0
+    },
+    {
+      "label": "ArcoxBTCPool-USDC-cirBTC",
+      "name": "AMM Pool USDC-cirBTC",
+      "address": "0xd4af8e12903a4c6bd60bbc353fb97ffc9cc2dc2d",
+      "kind": "direct",
+      "envOut": null,
+      "status": "verified",
+      "contractName": "ArcoxBTCPool",
+      "compilerVersion": "v0.8.24+commit.e11b9ed9",
+      "compilerSettings": {
+        "libraries": {},
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        },
+        "outputSelection": {
+          "*": {
+            "": [
+              "*"
+            ],
+            "*": [
+              "*"
+            ]
+          }
+        }
+      },
+      "optimization": {
+        "enabled": true,
+        "runs": 200
+      },
+      "evmVersion": "default",
+      "license": "none",
+      "filePath": "ArcoxBTCPool.sol",
+      "sourceFile": "ArcoxBTCPool-USDC-cirBTC/ArcoxBTCPool.sol",
+      "constructorArgsHex": "0x0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000f0c4a4ce82a5746abaad9425360ab04fbba432bf",
+      "constructorArgsDecoded": [
+        [
+          "0x3600000000000000000000000000000000000000",
+          {
+            "internalType": "address",
+            "name": "_token0",
+            "type": "address"
+          }
+        ],
+        [
+          "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+          {
+            "internalType": "address",
+            "name": "_token1",
+            "type": "address"
+          }
+        ]
+      ],
+      "proxyType": null,
+      "implementations": [],
+      "verifiedAt": "2026-07-25T00:19:51.332562Z",
+      "sourcifyRepoUrl": null,
+      "additionalSourceCount": 0
+    },
+    {
+      "label": "ArcoxBTCPool-EURC-cirBTC",
+      "name": "AMM Pool EURC-cirBTC",
+      "address": "0xcca97842509efae4a2ed4c95595fc559a1a6bfa2",
+      "kind": "direct",
+      "envOut": null,
+      "status": "verified",
+      "contractName": "ArcoxBTCPool",
+      "compilerVersion": "v0.8.24+commit.e11b9ed9",
+      "compilerSettings": {
+        "libraries": {},
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        },
+        "outputSelection": {
+          "*": {
+            "": [
+              "*"
+            ],
+            "*": [
+              "*"
+            ]
+          }
+        }
+      },
+      "optimization": {
+        "enabled": true,
+        "runs": 200
+      },
+      "evmVersion": "default",
+      "license": "none",
+      "filePath": "ArcoxBTCPool.sol",
+      "sourceFile": "ArcoxBTCPool-EURC-cirBTC/ArcoxBTCPool.sol",
+      "constructorArgsHex": "0x00000000000000000000000089b50855aa3be2f677cd6303cec089b5f319d72a000000000000000000000000f0c4a4ce82a5746abaad9425360ab04fbba432bf",
+      "constructorArgsDecoded": [
+        [
+          "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+          {
+            "internalType": "address",
+            "name": "_token0",
+            "type": "address"
+          }
+        ],
+        [
+          "0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF",
+          {
+            "internalType": "address",
+            "name": "_token1",
+            "type": "address"
+          }
+        ]
+      ],
+      "proxyType": null,
+      "implementations": [],
+      "verifiedAt": "2026-07-25T00:19:57.158240Z",
+      "sourcifyRepoUrl": null,
+      "additionalSourceCount": 0
+    },
+    {
+      "label": "Adapter",
+      "name": "Swap Adapter (implementation)",
+      "address": "0xb4d0aa6ca5e12b8a77b86989305a7f15462ac2d4",
+      "kind": "implementation",
+      "envOut": "ARCOX_SWAP_ADAPTER",
+      "status": "verified",
+      "contractName": "Adapter",
+      "compilerVersion": "v0.8.28+commit.7893614a",
+      "compilerSettings": {
+        "evmVersion": "paris",
+        "libraries": {},
+        "metadata": {
+          "appendCBOR": true,
+          "bytecodeHash": "ipfs",
+          "useLiteralContent": false
+        },
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        },
+        "outputSelection": {
+          "*": {
+            "": [
+              "*"
+            ],
+            "*": [
+              "*"
+            ]
+          }
+        },
+        "remappings": [
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
+          "forge-std/=lib/forge-std/src/",
+          "erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/",
+          "halmos-cheatcodes/=lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/"
+        ],
+        "viaIR": true
+      },
+      "optimization": {
+        "enabled": true,
+        "runs": 200
+      },
+      "evmVersion": "paris",
+      "license": "none",
+      "filePath": "src/adapter/Adapter.sol",
+      "sourceFile": "Adapter/src_adapter_Adapter.sol",
+      "constructorArgsHex": "",
+      "constructorArgsDecoded": [],
+      "proxyType": null,
+      "implementations": [],
+      "verifiedAt": "2026-06-17T03:11:18.069025Z",
+      "sourcifyRepoUrl": null,
+      "additionalSourceCount": 34
+    },
+    {
+      "label": "TransparentUpgradeableProxy-SwapAdapter",
+      "name": "Swap Adapter (proxy)",
+      "address": "0xBBD70b01a1CAbc96d5b7b129Ae1AAabdf50dd40b",
+      "kind": "proxy",
+      "envOut": "ARCOX_SWAP_ADAPTER",
+      "status": "verified",
+      "contractName": "TransparentUpgradeableProxy",
+      "compilerVersion": "v0.8.28+commit.7893614a",
+      "compilerSettings": {
+        "evmVersion": "paris",
+        "libraries": {},
+        "metadata": {
+          "appendCBOR": true,
+          "bytecodeHash": "ipfs",
+          "useLiteralContent": false
+        },
+        "optimizer": {
+          "enabled": true,
+          "runs": 200
+        },
+        "outputSelection": {
+          "*": {
+            "": [
+              "*"
+            ],
+            "*": [
+              "*"
+            ]
+          }
+        },
+        "remappings": [
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
+          "forge-std/=lib/forge-std/src/",
+          "erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/",
+          "halmos-cheatcodes/=lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/"
+        ],
+        "viaIR": true
+      },
+      "optimization": {
+        "enabled": true,
+        "runs": 200
+      },
+      "evmVersion": "paris",
+      "license": "none",
+      "filePath": "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
+      "sourceFile": "TransparentUpgradeableProxy-SwapAdapter/lib_openzeppelin-contracts-upgradeable_lib_openzeppelin-contracts_contracts_proxy_transparent_TransparentUpgradeableProxy.sol",
+      "constructorArgsHex": "000000000000000000000000cea69a03a998002296b5c6b089b94b2b498d8751000000000000000000000000fbc171f350319a2e06a80ae640cdd76df084d1ef000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000641794bb3c000000000000000000000000fbc171f350319a2e06a80ae640cdd76df084d1ef00000000000000000000000050c885e17d3429a2515ca3e499d9c2ac970990ba000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000",
+      "constructorArgsDecoded": [
+        [
+          "0xCeA69a03A998002296b5c6b089B94B2B498d8751",
+          {
+            "internalType": "address",
+            "name": "_logic",
+            "type": "address"
+          }
+        ],
+        [
+          "0xFbC171f350319a2E06A80AE640CDd76dF084D1eF",
+          {
+            "internalType": "address",
+            "name": "initialOwner",
+            "type": "address"
+          }
+        ],
+        [
+          "0x1794bb3c000000000000000000000000fbc171f350319a2e06a80ae640cdd76df084d1ef00000000000000000000000050c885e17d3429a2515ca3e499d9c2ac970990ba0000000000000000000000000000000000000000000000000000000000000001",
+          {
+            "internalType": "bytes",
+            "name": "_data",
+            "type": "bytes"
+          }
+        ]
+      ],
+      "proxyType": "eip1967",
+      "implementations": [
+        {
+          "address_hash": "0xb4d0aA6Ca5e12B8a77b86989305A7F15462Ac2D4",
+          "name": "Adapter"
+        }
+      ],
+      "verifiedAt": "2026-04-01T13:11:00.150856Z",
+      "sourcifyRepoUrl": null,
+      "additionalSourceCount": 11
+    },
+    {
+      "label": "AgenticCommerce",
+      "name": "ERC-8183 Agentic Commerce (implementation)",
+      "address": "0xa316fd02827242d537f84730f8a37d0ba5fd351a",
+      "kind": "implementation",
+      "envOut": "ARCOX_ERC8183_ADDRESS",
+      "status": "verified",
+      "contractName": "AgenticCommerce",
+      "compilerVersion": "v0.8.28+commit.7893614a",
+      "compilerSettings": {
+        "evmVersion": "cancun",
+        "libraries": {},
+        "metadata": {
+          "appendCBOR": true,
+          "bytecodeHash": "ipfs",
+          "useLiteralContent": false
+        },
+        "optimizer": {
+          "enabled": false,
+          "runs": 200
+        },
+        "outputSelection": {
+          "*": {
+            "": [
+              "*"
+            ],
+            "*": [
+              "*"
+            ]
+          }
+        },
+        "remappings": [
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/",
+          "forge-std/=lib/forge-std/src/",
+          "halmos-cheatcodes/=lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts/"
+        ],
+        "viaIR": false
+      },
+      "optimization": {
+        "enabled": false,
+        "runs": null
+      },
+      "evmVersion": "cancun",
+      "license": "none",
+      "filePath": "src/AgenticCommerce.sol",
+      "sourceFile": "AgenticCommerce/src_AgenticCommerce.sol",
+      "constructorArgsHex": "",
+      "constructorArgsDecoded": [],
+      "proxyType": null,
+      "implementations": [],
+      "verifiedAt": "2026-03-26T16:13:06.187896Z",
+      "sourcifyRepoUrl": null,
+      "additionalSourceCount": 26
+    },
+    {
+      "label": "ERC1967Proxy-AgenticCommerce",
+      "name": "ERC-8183 Agentic Commerce (proxy)",
+      "address": "0x0747EEf0706327138c69792bF28Cd525089e4583",
+      "kind": "proxy",
+      "envOut": "ARCOX_ERC8183_ADDRESS",
+      "status": "verified",
+      "contractName": "ERC1967Proxy",
+      "compilerVersion": "v0.8.28+commit.7893614a",
+      "compilerSettings": {
+        "evmVersion": "cancun",
+        "libraries": {},
+        "metadata": {
+          "appendCBOR": true,
+          "bytecodeHash": "ipfs",
+          "useLiteralContent": false
+        },
+        "optimizer": {
+          "enabled": false,
+          "runs": 200
+        },
+        "outputSelection": {
+          "*": {
+            "": [
+              "*"
+            ],
+            "*": [
+              "*"
+            ]
+          }
+        },
+        "remappings": [
+          "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+          "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+          "forge-std/=lib/forge-std/src/",
+          "erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/",
+          "halmos-cheatcodes/=lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes/src/",
+          "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/",
+          "openzeppelin-contracts/=lib/openzeppelin-contracts/"
+        ],
+        "viaIR": false
+      },
+      "optimization": {
+        "enabled": false,
+        "runs": null
+      },
+      "evmVersion": "cancun",
+      "license": "none",
+      "filePath": "lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol",
+      "sourceFile": "ERC1967Proxy-AgenticCommerce/lib_openzeppelin-contracts_contracts_proxy_ERC1967_ERC1967Proxy.sol",
+      "constructorArgsHex": "000000000000000000000000a316fd02827242d537f84730f8a37d0ba5fd351a00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000064c0c53b8b0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000cbe5b97a069be3e4b5398663790731fb76ab620d000000000000000000000000cbe5b97a069be3e4b5398663790731fb76ab620d00000000000000000000000000000000000000000000000000000000",
+      "constructorArgsDecoded": [
+        [
+          "0xA316fd02827242D537F84730F8a37D0BA5fd351a",
+          {
+            "internalType": "address",
+            "name": "implementation",
+            "type": "address"
+          }
+        ],
+        [
+          "0xc0c53b8b0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000cbe5b97a069be3e4b5398663790731fb76ab620d000000000000000000000000cbe5b97a069be3e4b5398663790731fb76ab620d",
+          {
+            "internalType": "bytes",
+            "name": "_data",
+            "type": "bytes"
+          }
+        ]
+      ],
+      "proxyType": "eip1967",
+      "implementations": [
+        {
+          "address_hash": "0xA316fd02827242D537F84730F8a37D0BA5fd351a",
+          "name": "AgenticCommerce"
+        }
+      ],
+      "verifiedAt": "2026-03-26T16:13:16.342366Z",
+      "sourcifyRepoUrl": null,
+      "additionalSourceCount": 8
+    }
+  ]
+}
