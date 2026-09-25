@@ -6,12 +6,15 @@
 | --- | --- | --- | --- | --- |
 | Arc Mainnet (5042) | `0x9Fd14A94bDbEFf73EDB22853cc77416B65E2A0c0` | 6 (Base) | `0x97f717a87509793afccf37cbee3a5c106e56d783432cc56ecea1a3a1ed0a5b11` | Sourcify `exact_match` |
 | Base Mainnet (8453) | `0xD858f073FA09834b1d64C165afC2757F1DF2f019` | 26 (Arc) | `0x0411ca0cfe45087e244df94621d5f663590f97fb110d8466f7c4e97e403af523` | Sourcify `exact_match` |
-| Arbitrum One (42161) | belum di-deploy | — | — | — |
+| Arbitrum One (42161) | `0xaF15a9fFdDB21A42Aa6175B8130aE69ce41C78F9` | 26 (Arc), 6 (Base) | `0x9ae11d17b754d6d47c7553757eb461a6630be06f43812baf71b456eb93d7f5cd` | Sourcify `exact_match` |
+
+Jaring destination domain lengkap: Arc → {6, 3}, Base → {26, 3}, Arbitrum → {26, 6}.
 
 Parameter: `owner` = `0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e`,
-`treasury` = `0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F`, `feeBps` = **500** (5%),
+`treasury` = `0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F` (**di ketiga chain**,
+diverifikasi on-chain oleh `mainnet:fee-router:verify`), `feeBps` = **500** (5%),
 `usdc` + `tokenMessenger` = alamat mainnet masing-masing chain (CCTP v2
-`0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d`), `localDomain` = 26 / 6.
+`0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d`), `localDomain` = 26 / 6 / 3.
 
 `fee-router-mainnet.json` adalah catatan otomatis dari skrip deploy + verifikasi.
 
@@ -72,4 +75,39 @@ npm run mainnet:fee-router:domains -- --key-file ~/.arcox/agent.env:EOA_PRIVATE_
 # 6. verifikasi
 npm run mainnet:fee-router:verify
 npm run mainnet:fee-router:verify-sources
+```
+
+## Swap Adapter — belum di-deploy, menunggu dana + keputusan
+
+Rencana ada di `scripts/deploy-swap-adapter-mainnet.mjs` (dry-run default).
+
+Yang perlu diketahui sebelum menjalankan:
+
+- **Kontrak `Adapter` tidak punya treasury maupun fee.** Fungsinya hanya eksekusi
+  batch swap dengan tanda tangan EIP-712. Parameter init-nya
+  `initialize(address owner_, address signer_, uint256 signerThreshold_)`.
+  Treasury 5% ada di Fee Router, bukan di sini — jadi alamat treasury tidak bisa
+  dipasang ke kontrak ini.
+- Alamat yang dipakai sistem adalah **proxy**; implementation-nya hanya di-deploy
+  sekali per chain.
+- Konstruktor proxy `(_logic, initialOwner, _data)`: OZ membuat ProxyAdmin baru
+  milik `initialOwner`, dan `_data` adalah panggilan `initialize` yang di-delegate.
+- Estimasi gas untuk proxy **tidak mungkin** dilakukan sebelum implementation ada
+  (delegatecall ke alamat tanpa kode selalu revert), jadi script memakai limit
+  tetap 1,2 juta gas kecuali implementation sudah ter-deploy.
+
+Kebutuhan dana (gas impl ≈ 3,94 juta + proxy ≈ 0,95 juta):
+
+| Chain | Perkiraan biaya | Saldo sekarang | Kurang |
+| --- | --- | --- | --- |
+| Arc | ≈0,098 USDC | 0,0513 USDC | ≈0,047 USDC |
+| Base | ≈0,0000293 ETH | 0,0000115 ETH | ≈0,000018 ETH |
+| Arbitrum | ≈0,0000978 ETH | 0,0000051 ETH | ≈0,000093 ETH |
+
+```bash
+npm run mainnet:swap-adapter:deploy -- \
+  --key-file ~/.arcox/agent.env:EOA_PRIVATE_KEY \
+  --adapter-owner <alamat> --signer <alamat> --signer-threshold 1 \
+  --proxy-admin-owner <alamat> --chains arc,base,arbitrum
+# tambahkan --broadcast untuk mengirim
 ```

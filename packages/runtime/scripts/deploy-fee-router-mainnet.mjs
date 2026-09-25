@@ -59,7 +59,7 @@ const CHAINS = {
 }
 
 function parseArgs(argv) {
-  const out = { chains: 'arc,base,arbitrum', broadcast: false, feeBps: 500 }
+  const out = { chains: 'arc,base,arbitrum', broadcast: false, feeBps: 500, gasPriceMultiplier: 1.25, gasLimitMultiplier: 1.2 }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--broadcast') out.broadcast = true
@@ -69,6 +69,8 @@ function parseArgs(argv) {
     else if (a === '--fee-bps') out.feeBps = Number(argv[++i])
     else if (a === '--chains') out.chains = argv[++i]
     else if (a === '--max-gas-price-gwei') out.maxGasPriceGwei = Number(argv[++i])
+    else if (a === '--gas-price-multiplier') out.gasPriceMultiplier = Number(argv[++i])
+    else if (a === '--gas-limit-multiplier') out.gasLimitMultiplier = Number(argv[++i])
     else if (a === '--help' || a === '-h') { console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('*/')[0]); process.exit(0) }
     else { console.error(`argumen tidak dikenal: ${a}`); process.exit(2) }
   }
@@ -166,20 +168,35 @@ for (const key of selected) {
     if (!usdcCode) throw new Error(`USDC tidak ada kode di ${c.usdc}`)
     if (!tmCode) throw new Error(`TokenMessengerV2 tidak ada kode di ${c.tokenMessenger}`)
     const gasEstimate = await publicClient.estimateGas({ account: account.address, data })
-    const gasCap = gasEstimate * 12n / 10n
-    const maxGasPrice = args.maxGasPriceGwei ? parseGwei(String(args.maxGasPriceGwei)) : gasPrice * 2n
+    // Pemakaian gas nyata biasanya sedikit di bawah hasil estimasi (kalibrasi Arc:
+    // 1.144.695 vs 1.154.947 estimasi), jadi pengali ini bisa dikecilkan saat dana
+    // sangat mepet — node mereservasi gasLimit x maxFeePerGas sejak submit.
+    const gasCap = gasEstimate * BigInt(Math.round(args.gasLimitMultiplier * 100)) / 100n
+    // Pengali harga gas untuk batas atas. 1.25 cukup untuk Arc/Base/Arbitrum yang
+    // harga gasnya stabil; nilai lebih besar hanya membuat gerbang dana menolak
+    // deploy yang sebenarnya cukup (kalibrasi: deploy Arc nyata 1.144.695 gas,
+    // bukan 1.44 juta).
+    const gasPriceMultiplier = BigInt(Math.round(args.gasPriceMultiplier * 100))
+    const maxGasPrice = args.maxGasPriceGwei
+      ? parseGwei(String(args.maxGasPriceGwei))
+      : gasPrice * gasPriceMultiplier / 100n
     // Kontrak belum ada, jadi tx setSupportedDestinationDomain tidak bisa diestimasi
     // sungguhan — pakai anggaran konservatif 60k gas per domain.
     const DOMAIN_GAS_BUDGET = 60_000n
     const domainGasBudget = DOMAIN_GAS_BUDGET * BigInt(domainsToEnable.length)
-    const worstCost = (gasCap + domainGasBudget) * maxGasPrice
-    const ok = balance > worstCost
+    // Gerbang dana memakai perkiraan gas nyata (buffer 5%) DITAMBAH reservasi gas
+    // limit, karena node bisa menolak submit kalau saldo < gasLimit x maxFeePerGas.
+    const worstCost = (gasEstimate * 105n / 100n + domainGasBudget) * maxGasPrice
+    const reserved = gasCap * maxGasPrice
+    const ok = balance > worstCost && balance > reserved
 
     console.log(`  chainId      : ${chainId} ✓`)
     console.log(`  USDC         : ${c.usdc} (${usdcCode.length} hex) ✓`)
     console.log(`  TokenMsgV2   : ${c.tokenMessenger} (${tmCode.length} hex) ✓`)
     console.log(`  saldo        : ${formatUnits(balance, c.nativeDecimals)} ${c.nativeSymbol}  | gasPrice ${formatUnits(gasPrice, 9)} gwei`)
-    console.log(`  gas estimate : deploy ${gasEstimate} (cap ${gasCap}) + domain ${domainGasBudget} → biaya maks ${formatUnits(worstCost, c.nativeDecimals)} ${c.nativeSymbol}`)
+    console.log(`  gas estimate : deploy ${gasEstimate} (limit ${gasCap}, ${args.gasLimitMultiplier}x) + domain ${domainGasBudget} @ ${args.maxGasPriceGwei ? args.maxGasPriceGwei + ' gwei' : args.gasPriceMultiplier + 'x gasPrice'}`)
+    console.log(`  reservasi    : ${formatUnits(gasCap * maxGasPrice, c.nativeDecimals)} ${c.nativeSymbol} (gasLimit x maxFeePerGas)`)
+    console.log(`  biaya maks   : ${formatUnits(worstCost, c.nativeDecimals)} ${c.nativeSymbol}`)
     console.log(`  pendanaan    : ${ok ? 'CUKUP ✓' : `KURANG ✗ (butuh minimal ${formatUnits(worstCost, c.nativeDecimals)} ${c.nativeSymbol})`}`)
     console.log(`  domain aktif : ${domainsToEnable.length ? domainsToEnable.join(', ') : '(tidak ada)'}`)
     entry.usdcCodeBytes = usdcCode.length / 2 - 1
@@ -235,13 +252,40 @@ for (const key of selected) {
 
 if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
 const outPath = join(OUT_DIR, 'fee-router-mainnet.json')
+
+// Gabungkan dengan log lama, jangan ditimpa: menjalankan deploy untuk satu chain
+// tidak boleh menghapus data chain lain yang sudah ter-deploy (pernah terjadi dan
+// membuat Arc/Base hilang dari catatan).
+let previous = { chains: [] }
+if (existsSync(outPath)) {
+  try { previous = JSON.parse(readFileSync(outPath, 'utf8')) } catch { previous = { chains: [] } }
+}
+const previousByChain = new Map((previous.chains || []).map((entry) => [entry.chain, entry]))
+const mergedChains = results.map((entry) => {
+  const before = previousByChain.get(entry.chain)
+  // Hasil baru yang belum punya alamat (dry-run/gagal) tidak menimpa alamat lama.
+  if (!before) return entry
+  return {
+    ...entry,
+    address: entry.address || before.address || null,
+    deployTx: entry.deployTx || before.deployTx || null,
+    blockNumber: entry.blockNumber || before.blockNumber,
+    domainTxs: entry.domainTxs?.length ? entry.domainTxs : (before.domainTxs || []),
+    destinationDomains: entry.destinationDomains?.length ? entry.destinationDomains : (before.destinationDomains || []),
+    sourcify: entry.sourcify || before.sourcify,
+    verified: entry.verified || before.verified,
+  }
+})
+for (const [chain, before] of previousByChain) {
+  if (!mergedChains.some((entry) => entry.chain === chain)) mergedChains.push(before)
+}
 writeFileSync(outPath, `${JSON.stringify({
   generatedAt: new Date().toISOString(),
   broadcast: args.broadcast,
   deployer: account.address,
   owner, treasury, feeBps: args.feeBps,
   bytecodeKeccak256: keccak256(bytecode),
-  chains: results,
+  chains: mergedChains,
 }, null, 2)}\n`)
 console.log(`\nhasil ditulis: ${outPath}`)
 if (blocked) {

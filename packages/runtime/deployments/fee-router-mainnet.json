@@ -1,6 +1,7 @@
 {
-  "generatedAt": "2026-09-25T15:43:03.356Z",
+  "generatedAt": "2026-09-25T16:10:00.000Z",
   "broadcast": true,
+  "note": "Catatan deploy ARCOX Fee Router mainnet. Entri Arc/Base dipulihkan manual setelah log tertimpa oleh run khusus Arbitrum; skrip deploy sekarang menggabungkan, bukan menimpa. Semua nilai divalidasi ulang oleh scripts/verify-fee-router-mainnet.mjs.",
   "deployer": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
   "owner": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
   "treasury": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
@@ -22,16 +23,25 @@
         "feeBps": 500
       },
       "destinationDomains": [
-        6
+        6,
+        3
       ],
       "address": "0x9fd14a94bdbeff73edb22853cc77416b65e2a0c0",
       "deployTx": "0x97f717a87509793afccf37cbee3a5c106e56d783432cc56ecea1a3a1ed0a5b11",
       "domainTxs": [
         {
           "domain": 6,
+          "chain": "base",
           "hash": "0x26cafb1004bcf4f32c17442c1a656b074f9cfd91c3fa6e2211bbaee473d9b57c",
           "status": "success",
-          "blockNumber": "22710757"
+          "gasUsed": "47563"
+        },
+        {
+          "domain": 3,
+          "chain": "arbitrum",
+          "hash": "0xb903763ddef8f7043b222acd37fbcdb03677db2d1ec6d990b58f383e29a02fbb",
+          "status": "success",
+          "gasUsed": "47563"
         }
       ],
       "error": null,
@@ -51,7 +61,7 @@
         "creationMatch": "exact_match",
         "runtimeMatch": "exact_match",
         "repoUrl": "https://repo.sourcify.dev/5042/0x9fd14a94bdbeff73edb22853cc77416b65e2a0c0",
-        "checkedAt": "2026-09-25T15:47:30.379Z"
+        "checkedAt": "2026-09-25T16:06:52.107Z"
       }
     },
     {
@@ -69,21 +79,23 @@
         "feeBps": 500
       },
       "destinationDomains": [
-        26
+        26,
+        3
       ],
       "address": "0xd858f073fa09834b1d64c165afc2757f1df2f019",
       "deployTx": "0x0411ca0cfe45087e244df94621d5f663590f97fb110d8466f7c4e97e403af523",
       "domainTxs": [
         {
           "domain": 26,
-          "hash": "0x9d74314eaf18433802b10db04f05f65f23595ce9a359e4017c2b52fcc7b5b0df",
-          "status": "reverted",
-          "blockNumber": "51780819"
-        },
-        {
-          "domain": 26,
           "chain": "arc",
           "hash": "0xd99fdc79b39f937b054faa6ebb92794c3809608b0b783e07cf9c2e99abf2e9d2",
+          "status": "success",
+          "gasUsed": "47563"
+        },
+        {
+          "domain": 3,
+          "chain": "arbitrum",
+          "hash": "0xfd9402a9db5bfe3c7cdd94122d6a5c6fd1fd128e4698a8b882c3934ec885c230",
           "status": "success",
           "gasUsed": "47563"
         }
@@ -105,13 +117,69 @@
         "creationMatch": "exact_match",
         "runtimeMatch": "exact_match",
         "repoUrl": "https://repo.sourcify.dev/8453/0xd858f073fa09834b1d64c165afc2757f1df2f019",
-        "checkedAt": "2026-09-25T15:47:32.515Z"
+        "checkedAt": "2026-09-25T16:06:53.259Z"
+      }
+    },
+    {
+      "chain": "arbitrum",
+      "name": "Arbitrum One",
+      "chainId": 42161,
+      "explorer": "https://arbiscan.io",
+      "dryRun": false,
+      "constructor": {
+        "initialOwner": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+        "initialTreasury": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+        "usdc": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "tokenMessenger": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+        "localDomain": 3,
+        "feeBps": 500
+      },
+      "destinationDomains": [
+        26,
+        6
+      ],
+      "address": "0xaf15a9ffddb21a42aa6175b8130ae69ce41c78f9",
+      "deployTx": "0x9ae11d17b754d6d47c7553757eb461a6630be06f43812baf71b456eb93d7f5cd",
+      "domainTxs": [
+        {
+          "domain": 26,
+          "chain": "arc",
+          "hash": "0x5935a633d7d0c3d5a4b0f2e4233b88b2284da87b4a1dd920f9ec76a468345761",
+          "status": "success",
+          "gasUsed": "48923"
+        },
+        {
+          "domain": 6,
+          "chain": "base",
+          "hash": "0xfd07ceca8b5c446c51f0aef92dc97f7368d6c559b08471cdf18b4bcbf0460716",
+          "status": "success",
+          "gasUsed": "48925"
+        }
+      ],
+      "error": null,
+      "usdcCodeBytes": 1852,
+      "tokenMessengerCodeBytes": 2175,
+      "gasEstimate": "1180829",
+      "gasCap": "1239870",
+      "domainGasBudget": "0",
+      "gasPriceWei": "20020000",
+      "balance": "0.000030396063803318",
+      "worstCost": "0.00002606330727",
+      "funded": true,
+      "blockNumber": "508812998",
+      "sourcify": {
+        "status": "exact_match",
+        "verificationId": "bcef6053-58b9-407b-b750-65788720f067",
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match",
+        "repoUrl": "https://repo.sourcify.dev/42161/0xaf15a9ffddb21a42aa6175b8130ae69ce41c78f9",
+        "checkedAt": "2026-09-25T16:07:02.183Z"
       }
     }
   ],
-  "updatedAt": "2026-09-25T15:44:55.110Z",
+  "updatedAt": "2026-09-25T16:06:44.237Z",
   "verification": {
-    "sourcifyCheckedAt": "2026-09-25T15:47:32.515Z",
+    "sourcifyCheckedAt": "2026-09-25T16:07:02.183Z",
     "compilerVersion": "0.8.35+commit.47b9dedd",
     "contractIdentifier": "ArcoxRouter.sol:ArcoxRouter"
   }

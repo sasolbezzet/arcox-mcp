@@ -31,7 +31,10 @@ const CHAINS = {
   arbitrum: { name: 'Arbitrum One', id: 42161, rpc: 'https://arb1.arbitrum.io/rpc', cctpDomain: 3, nativeDecimals: 18, nativeSymbol: 'ETH' },
 }
 
-const DOMAIN_TX_GAS = 120_000n
+// Limit gas eksplisit (limit default 22.026 pernah membuat tx revert). Pemakaian
+// nyata satu SSTORE ≈ 46k gas, jadi nilai ini bisa diturunkan lewat `--gas` saat
+// saldo sangat mepet — node mereservasi gasLimit x maxFeePerGas sejak submit.
+let DOMAIN_TX_GAS = 120_000n
 
 const abi = JSON.parse(readFileSync(join(SOURCES, 'abi.json'), 'utf8'))
 
@@ -42,12 +45,14 @@ function parseArgs(argv) {
     if (a === '--broadcast') out.broadcast = true
     else if (a === '--key-file') out.keyFile = argv[++i]
     else if (a === '--chains') out.chains = argv[++i].split(',').map((s) => s.trim()).filter(Boolean)
+    else if (a === '--gas') out.gas = BigInt(argv[++i])
     else throw new Error(`argumen tidak dikenal: ${a}`)
   }
   return out
 }
 
 const args = parseArgs(process.argv.slice(2))
+if (args.gas) DOMAIN_TX_GAS = args.gas
 if (!existsSync(DEPLOYMENTS)) throw new Error(`tidak ada ${DEPLOYMENTS} — deploy dulu`)
 const log = JSON.parse(readFileSync(DEPLOYMENTS, 'utf8'))
 
