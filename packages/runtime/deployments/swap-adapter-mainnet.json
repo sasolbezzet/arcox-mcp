@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-25T16:08:29.692Z",
+  "generatedAt": "2026-09-25T16:12:19.960Z",
   "broadcast": false,
   "deployer": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
   "adapterOwner": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
@@ -33,9 +33,9 @@
       "error": "saldo deployer tidak cukup",
       "implGasEstimate": "3941329",
       "proxyGasEstimate": "1200000",
-      "gasPriceWei": "20132250000",
+      "gasPriceWei": "20100000000",
       "balance": "0.05132734",
-      "reserved": "0.148790614785",
+      "reserved": "0.148552266",
       "funded": false
     },
     {
@@ -75,11 +75,11 @@
       "implDeployTx": null,
       "proxyDeployTx": null,
       "error": "saldo deployer tidak cukup",
-      "implGasEstimate": "4027893",
+      "implGasEstimate": "4087749",
       "proxyGasEstimate": "1200000",
-      "gasPriceWei": "20010000",
+      "gasPriceWei": "20062000",
       "balance": "0.000005081920047318",
-      "reserved": "0.00015037705095",
+      "reserved": "0.0001524940456025",
       "funded": false
     }
   ]

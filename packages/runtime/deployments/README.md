@@ -96,13 +96,28 @@ Yang perlu diketahui sebelum menjalankan:
   (delegatecall ke alamat tanpa kode selalu revert), jadi script memakai limit
   tetap 1,2 juta gas kecuali implementation sudah ter-deploy.
 
+Parameter yang sudah diputuskan operator (tercatat di `swap-adapter-mainnet.json`):
+
+| Peran | Alamat |
+| --- | --- |
+| `owner` adapter | `0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F` |
+| Pemilik ProxyAdmin (hak upgrade) | `0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F` |
+| Signer EIP-712 (threshold 1) | `0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e` |
+
+> Catatan risiko: owner + ProxyAdmin dipegang `0x5d16E8Ef…`, dan key alamat itu
+> **tidak** ada di VPS ini. Selama key itu tidak tersedia, adapter tidak bisa
+> ditambah signer atau di-upgrade. Key signer (`0xE34FF1D2…`) tersedia, jadi
+> eksekusi swap tetap bisa jalan.
+
 Kebutuhan dana (gas impl ≈ 3,94 juta + proxy ≈ 0,95 juta):
 
-| Chain | Perkiraan biaya | Saldo sekarang | Kurang |
-| --- | --- | --- | --- |
-| Arc | ≈0,098 USDC | 0,0513 USDC | ≈0,047 USDC |
-| Base | ≈0,0000293 ETH | 0,0000115 ETH | ≈0,000018 ETH |
-| Arbitrum | ≈0,0000978 ETH | 0,0000051 ETH | ≈0,000093 ETH |
+| Chain | Perkiraan biaya | Saldo sekarang | Kurang | Saran kirim |
+| --- | --- | --- | --- | --- |
+| Arc | ≈0,098 USDC | 0,0513 USDC | ≈0,047 USDC | 1 USDC |
+| Base | ≈0,0000293 ETH | 0,0000115 ETH | ≈0,000018 ETH | 0,0005 ETH |
+| Arbitrum | ≈0,0000978 ETH | 0,0000051 ETH | ≈0,000093 ETH | 0,001 ETH |
+
+Belum ada transaksi adapter yang dikirim — preflight berhenti di gerbang dana.
 
 ```bash
 npm run mainnet:swap-adapter:deploy -- \
