@@ -109,7 +109,27 @@ for (const target of TARGETS) {
       writeFileSync(extraFile, extra.content, 'utf8')
     }
     writeFileSync(join(dir, 'abi.json'), JSON.stringify(data.abi || [], null, 2), 'utf8')
-    writeFileSync(join(dir, 'creation-bytecode.txt'), String(data.creation_bytecode || ''), 'utf8')
+
+    // PENTING: `creation_bytecode` dari Blockscout sudah menyertakan constructor
+    // args milik deploy testnet di ekornya. Kalau file itu dipakai apa adanya lalu
+    // argumen baru ditempel (encodeDeployData), EVM membaca argumen testnet yang
+    // tertanam — immutables kontrak jadi salah. Jadi ekornya dilepas di sini dan
+    // disimpan terpisah.
+    const creationRaw = String(data.creation_bytecode || '')
+    const constructorArgs = String(data.constructor_args || '')
+    // Blockscout mengirim `constructor_args` berprefiks 0x, sementara ekor
+    // `creation_bytecode` tidak — normalisasi dulu sebelum membandingkan.
+    const bareHex = (value) => String(value || '').replace(/^0x/i, '').toLowerCase()
+    const rawHex = bareHex(creationRaw)
+    const argsHex = bareHex(constructorArgs)
+    let creationCode = creationRaw
+    let argsStripped = false
+    if (argsHex && rawHex.endsWith(argsHex)) {
+      creationCode = `0x${rawHex.slice(0, rawHex.length - argsHex.length)}`
+      argsStripped = true
+    }
+    writeFileSync(join(dir, 'creation-bytecode.txt'), creationCode, 'utf8')
+    if (constructorArgs) writeFileSync(join(dir, 'constructor-args.txt'), constructorArgs, 'utf8')
 
     entry.status = 'verified'
     entry.contractName = data.name
@@ -120,6 +140,8 @@ for (const target of TARGETS) {
     entry.license = data.license_type
     entry.filePath = data.file_path
     entry.sourceFile = join(target.label, fileName)
+    entry.creationBytecodeBytes = (creationCode.length - 2) / 2
+    entry.creationBytecodeArgsStripped = argsStripped
     entry.constructorArgsHex = data.constructor_args || ''
     entry.constructorArgsDecoded = data.decoded_constructor_args || []
     entry.proxyType = data.proxy_type || null

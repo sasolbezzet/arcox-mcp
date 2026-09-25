@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-09-25T04:47:24.625Z",
+  "fetchedAt": "2026-09-25T15:42:28.879Z",
   "sourceApi": "https://testnet.arcscan.app/api/v2",
   "note": "Source terverifikasi dari ArcScan (Arc testnet) untuk redeploy ke Arc mainnet. Testnet-only snapshot.",
   "contracts": [
@@ -26,6 +26,8 @@
       "license": "none",
       "filePath": "ArcoxRouter.sol",
       "sourceFile": "ArcoxRouter/ArcoxRouter.sol",
+      "creationBytecodeBytes": 5641,
+      "creationBytecodeArgsStripped": true,
       "constructorArgsHex": "0x000000000000000000000000e34ff1d2c925ddafb28c95c2396fc49a6f64569e000000000000000000000000e34ff1d2c925ddafb28c95c2396fc49a6f64569e00000000000000000000000036000000000000000000000000000000000000000000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001e",
       "constructorArgsDecoded": [
         [
@@ -106,6 +108,8 @@
       "license": "none",
       "filePath": "ArcoxCirBTCRouterV2.sol",
       "sourceFile": "ArcoxCirBTCRouterV2/ArcoxCirBTCRouterV2.sol",
+      "creationBytecodeBytes": 5000,
+      "creationBytecodeArgsStripped": true,
       "constructorArgsHex": "0x000000000000000000000000e34ff1d2c925ddafb28c95c2396fc49a6f64569e000000000000000000000000360000000000000000000000000000000000000000000000000000000000000089b50855aa3be2f677cd6303cec089b5f319d72a000000000000000000000000f0c4a4ce82a5746abaad9425360ab04fbba432bf",
       "constructorArgsDecoded": [
         [
@@ -181,6 +185,8 @@
       "license": "none",
       "filePath": "ArcoxCirBTCRouter.sol",
       "sourceFile": "ArcoxCirBTCRouter/ArcoxCirBTCRouter.sol",
+      "creationBytecodeBytes": 2917,
+      "creationBytecodeArgsStripped": true,
       "constructorArgsHex": "0x000000000000000000000000e34ff1d2c925ddafb28c95c2396fc49a6f64569e",
       "constructorArgsDecoded": [
         [
@@ -232,6 +238,8 @@
       "license": "none",
       "filePath": "ArcoxBTCPool.sol",
       "sourceFile": "ArcoxBTCPool-USDC-cirBTC/ArcoxBTCPool.sol",
+      "creationBytecodeBytes": 4976,
+      "creationBytecodeArgsStripped": true,
       "constructorArgsHex": "0x0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000f0c4a4ce82a5746abaad9425360ab04fbba432bf",
       "constructorArgsDecoded": [
         [
@@ -291,6 +299,8 @@
       "license": "none",
       "filePath": "ArcoxBTCPool.sol",
       "sourceFile": "ArcoxBTCPool-EURC-cirBTC/ArcoxBTCPool.sol",
+      "creationBytecodeBytes": 4976,
+      "creationBytecodeArgsStripped": true,
       "constructorArgsHex": "0x00000000000000000000000089b50855aa3be2f677cd6303cec089b5f319d72a000000000000000000000000f0c4a4ce82a5746abaad9425360ab04fbba432bf",
       "constructorArgsDecoded": [
         [
@@ -366,6 +376,8 @@
       "license": "none",
       "filePath": "src/adapter/Adapter.sol",
       "sourceFile": "Adapter/src_adapter_Adapter.sol",
+      "creationBytecodeBytes": 17945,
+      "creationBytecodeArgsStripped": false,
       "constructorArgsHex": "",
       "constructorArgsDecoded": [],
       "proxyType": null,
@@ -424,6 +436,8 @@
       "license": "none",
       "filePath": "lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
       "sourceFile": "TransparentUpgradeableProxy-SwapAdapter/lib_openzeppelin-contracts-upgradeable_lib_openzeppelin-contracts_contracts_proxy_transparent_TransparentUpgradeableProxy.sol",
+      "creationBytecodeBytes": 2855,
+      "creationBytecodeArgsStripped": true,
       "constructorArgsHex": "000000000000000000000000cea69a03a998002296b5c6b089b94b2b498d8751000000000000000000000000fbc171f350319a2e06a80ae640cdd76df084d1ef000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000641794bb3c000000000000000000000000fbc171f350319a2e06a80ae640cdd76df084d1ef00000000000000000000000050c885e17d3429a2515ca3e499d9c2ac970990ba000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000",
       "constructorArgsDecoded": [
         [
@@ -512,6 +526,8 @@
       "license": "none",
       "filePath": "src/AgenticCommerce.sol",
       "sourceFile": "AgenticCommerce/src_AgenticCommerce.sol",
+      "creationBytecodeBytes": 22063,
+      "creationBytecodeArgsStripped": false,
       "constructorArgsHex": "",
       "constructorArgsDecoded": [],
       "proxyType": null,
@@ -570,6 +586,8 @@
       "license": "none",
       "filePath": "lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol",
       "sourceFile": "ERC1967Proxy-AgenticCommerce/lib_openzeppelin-contracts_contracts_proxy_ERC1967_ERC1967Proxy.sol",
+      "creationBytecodeBytes": 1672,
+      "creationBytecodeArgsStripped": true,
       "constructorArgsHex": "000000000000000000000000a316fd02827242d537f84730f8a37d0ba5fd351a00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000064c0c53b8b0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000cbe5b97a069be3e4b5398663790731fb76ab620d000000000000000000000000cbe5b97a069be3e4b5398663790731fb76ab620d00000000000000000000000000000000000000000000000000000000",
       "constructorArgsDecoded": [
         [

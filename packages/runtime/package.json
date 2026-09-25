@@ -16,6 +16,13 @@
     "deploy:solana-router": "node scripts/deploy-solana-router.mjs",
     "verify:router": "node scripts/verify-router.mjs",
     "mainnet:sources": "node scripts/fetch-verified-sources.mjs",
-    "mainnet:plan": "node scripts/plan-mainnet-deploy.mjs"
+    "mainnet:plan": "node scripts/plan-mainnet-deploy.mjs",
+    "mainnet:balances": "node scripts/check-mainnet-balances.mjs",
+    "mainnet:gateway-balances": "node scripts/check-gateway-balances.mjs",
+    "mainnet:fee-router:deploy": "node scripts/deploy-fee-router-mainnet.mjs",
+    "mainnet:fee-router:domains": "node scripts/set-fee-router-domains.mjs",
+    "mainnet:fee-router:verify": "node scripts/verify-fee-router-mainnet.mjs",
+    "mainnet:fee-router:verify-sources": "node scripts/verify-sources-sourcify.mjs",
+    "check:mainnet": "node --check scripts/deploy-fee-router-mainnet.mjs && node --check scripts/set-fee-router-domains.mjs && node --check scripts/verify-fee-router-mainnet.mjs && node --check scripts/verify-sources-sourcify.mjs && node --check scripts/fetch-verified-sources.mjs && node --check scripts/check-mainnet-balances.mjs && node --check scripts/check-gateway-balances.mjs"
   }
 }

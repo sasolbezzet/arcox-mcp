@@ -1,0 +1,89 @@
+{
+  "generatedAt": "2026-09-25T15:39:49.788Z",
+  "broadcast": true,
+  "deployer": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+  "owner": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+  "treasury": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+  "feeBps": 500,
+  "bytecodeKeccak256": "0x193a2eec1c4df6483fe73128874db1a9727864cb4c1662fb9f4785238680fe16",
+  "chains": [
+    {
+      "chain": "arc",
+      "name": "Arc Mainnet",
+      "chainId": 5042,
+      "explorer": "https://explorer.arc.io",
+      "dryRun": false,
+      "constructor": {
+        "initialOwner": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+        "initialTreasury": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+        "usdc": "0x3600000000000000000000000000000000000000",
+        "tokenMessenger": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+        "localDomain": 26,
+        "feeBps": 500
+      },
+      "destinationDomains": [
+        6
+      ],
+      "address": "0xb9fb801a5d1491e70a886800982cb80cdf98a174",
+      "deployTx": "0x23fefe33b2b2c8cc5924130dd9f8aee6872d1f9649d1159731dfc292b985135c",
+      "domainTxs": [
+        {
+          "domain": 6,
+          "hash": "0xc55f9b3cfe7374f1afe2798b66c898248db6c772b0d2d19b67ec53d17360e6b1",
+          "status": "success",
+          "blockNumber": "22710375"
+        }
+      ],
+      "error": null,
+      "usdcCodeBytes": 1798,
+      "tokenMessengerCodeBytes": 2175,
+      "gasEstimate": "1156513",
+      "gasCap": "1387815",
+      "domainGasBudget": "60000",
+      "gasPriceWei": "20115000000",
+      "balance": "0.1",
+      "worstCost": "0.05824559745",
+      "funded": true,
+      "blockNumber": "22710373"
+    },
+    {
+      "chain": "base",
+      "name": "Base Mainnet",
+      "chainId": 8453,
+      "explorer": "https://basescan.org",
+      "dryRun": false,
+      "constructor": {
+        "initialOwner": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+        "initialTreasury": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+        "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "tokenMessenger": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+        "localDomain": 6,
+        "feeBps": 500
+      },
+      "destinationDomains": [
+        26
+      ],
+      "address": "0xc31f668b17a8a923d661f2fc16a89cd0bd14a39b",
+      "deployTx": "0x379754398c58fa0245cdc15ee903c51326a956b4502c056fcaa82c752ce45cf1",
+      "domainTxs": [
+        {
+          "domain": 26,
+          "hash": "0x6f1a63405dc74796fad74b54d1e47487013ed3003a26dd8205eb150558b471e5",
+          "status": "success",
+          "blockNumber": "51780722"
+        }
+      ],
+      "error": null,
+      "usdcCodeBytes": 1852,
+      "tokenMessengerCodeBytes": 2175,
+      "gasEstimate": "1156743",
+      "gasCap": "1388091",
+      "domainGasBudget": "60000",
+      "gasPriceWei": "6000000",
+      "balance": "0.000024064293182385",
+      "worstCost": "0.000017377092",
+      "funded": true,
+      "blockNumber": "51780721"
+    }
+  ]
+}

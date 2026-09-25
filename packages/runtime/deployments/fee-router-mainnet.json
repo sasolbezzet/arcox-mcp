@@ -1,0 +1,118 @@
+{
+  "generatedAt": "2026-09-25T15:43:03.356Z",
+  "broadcast": true,
+  "deployer": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+  "owner": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+  "treasury": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+  "feeBps": 500,
+  "bytecodeKeccak256": "0xe91b6889264f9477289a17caecba04da53b5f7b683fdb2cd004ae7c5ddaafb78",
+  "chains": [
+    {
+      "chain": "arc",
+      "name": "Arc Mainnet",
+      "chainId": 5042,
+      "explorer": "https://explorer.arc.io",
+      "dryRun": false,
+      "constructor": {
+        "initialOwner": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+        "initialTreasury": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+        "usdc": "0x3600000000000000000000000000000000000000",
+        "tokenMessenger": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+        "localDomain": 26,
+        "feeBps": 500
+      },
+      "destinationDomains": [
+        6
+      ],
+      "address": "0x9fd14a94bdbeff73edb22853cc77416b65e2a0c0",
+      "deployTx": "0x97f717a87509793afccf37cbee3a5c106e56d783432cc56ecea1a3a1ed0a5b11",
+      "domainTxs": [
+        {
+          "domain": 6,
+          "hash": "0x26cafb1004bcf4f32c17442c1a656b074f9cfd91c3fa6e2211bbaee473d9b57c",
+          "status": "success",
+          "blockNumber": "22710757"
+        }
+      ],
+      "error": null,
+      "usdcCodeBytes": 1798,
+      "tokenMessengerCodeBytes": 2175,
+      "gasEstimate": "1154947",
+      "gasCap": "1385936",
+      "domainGasBudget": "60000",
+      "gasPriceWei": "20115000000",
+      "balance": "0.07612376",
+      "worstCost": "0.05817000528",
+      "funded": true,
+      "blockNumber": "22710755",
+      "sourcify": {
+        "status": "exact_match",
+        "verificationId": null,
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match",
+        "repoUrl": "https://repo.sourcify.dev/5042/0x9fd14a94bdbeff73edb22853cc77416b65e2a0c0",
+        "checkedAt": "2026-09-25T15:47:30.379Z"
+      }
+    },
+    {
+      "chain": "base",
+      "name": "Base Mainnet",
+      "chainId": 8453,
+      "explorer": "https://basescan.org",
+      "dryRun": false,
+      "constructor": {
+        "initialOwner": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
+        "initialTreasury": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+        "usdc": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "tokenMessenger": "0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d",
+        "localDomain": 6,
+        "feeBps": 500
+      },
+      "destinationDomains": [
+        26
+      ],
+      "address": "0xd858f073fa09834b1d64c165afc2757f1df2f019",
+      "deployTx": "0x0411ca0cfe45087e244df94621d5f663590f97fb110d8466f7c4e97e403af523",
+      "domainTxs": [
+        {
+          "domain": 26,
+          "hash": "0x9d74314eaf18433802b10db04f05f65f23595ce9a359e4017c2b52fcc7b5b0df",
+          "status": "reverted",
+          "blockNumber": "51780819"
+        },
+        {
+          "domain": 26,
+          "chain": "arc",
+          "hash": "0xd99fdc79b39f937b054faa6ebb92794c3809608b0b783e07cf9c2e99abf2e9d2",
+          "status": "success",
+          "gasUsed": "47563"
+        }
+      ],
+      "error": null,
+      "usdcCodeBytes": 1852,
+      "tokenMessengerCodeBytes": 2175,
+      "gasEstimate": "1155177",
+      "gasCap": "1386212",
+      "domainGasBudget": "60000",
+      "gasPriceWei": "6000000",
+      "balance": "0.000017944846269623",
+      "worstCost": "0.000017354544",
+      "funded": true,
+      "blockNumber": "51780818",
+      "sourcify": {
+        "status": "exact_match",
+        "verificationId": null,
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match",
+        "repoUrl": "https://repo.sourcify.dev/8453/0xd858f073fa09834b1d64c165afc2757f1df2f019",
+        "checkedAt": "2026-09-25T15:47:32.515Z"
+      }
+    }
+  ],
+  "updatedAt": "2026-09-25T15:44:55.110Z",
+  "verification": {
+    "sourcifyCheckedAt": "2026-09-25T15:47:32.515Z",
+    "compilerVersion": "0.8.35+commit.47b9dedd",
+    "contractIdentifier": "ArcoxRouter.sol:ArcoxRouter"
+  }
+}
