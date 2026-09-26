@@ -160,25 +160,25 @@ const docsCatalog = [
     id: 'overview',
     title: 'ARCOX Overview',
     tags: ['dex', 'arc', 'wallet', 'retail'],
-    body: 'ARCOX DEX is a retail Arc Testnet app for swap, bridge, send, receive/payment request, ARCOX Pay invoices, transaction history, and agent workflows. Value-moving actions must quote before execution.',
+    body: 'ARCOX DEX is a retail Arc Mainnet app for swap, bridge, send, receive/payment request, ARCOX Pay invoices, transaction history, and agent workflows. Value-moving actions must quote before execution.',
   },
   {
     id: 'pay',
     title: 'ARCOX Pay',
     tags: ['pay', 'invoice', 'payment request', 'usdc'],
-    body: 'ARCOX Pay creates public USDC invoice/payment links on Arc Testnet. It is not private payment and does not charge hidden merchant fees. Invoice payment requires preview and confirmation.',
+    body: 'ARCOX Pay creates public USDC invoice/payment links on Arc Mainnet. It is not private payment and does not charge hidden merchant fees. Invoice payment requires preview and confirmation.',
   },
   {
     id: 'circle-nanopayments',
     title: 'Circle Gateway Nanopayments Readiness',
     tags: ['circle', 'gateway', 'nanopayments', 'x402', 'eip-3009'],
-    body: 'Circle Gateway/Unified Balance can route USDC for x402 payments. Current ARCOX x402 live testnet path is Arc USDC with Arc transaction memo; gas-free nanopayments settlement is roadmap/readiness only.',
+    body: 'Circle Gateway/Unified Balance can route USDC for x402 payments. Current ARCOX x402 live mainnet path is Arc USDC with Arc transaction memo; gas-free nanopayments settlement is roadmap/readiness only.',
   },
   {
     id: 'circle-agents',
     title: 'Circle for Agents Alignment',
     tags: ['circle', 'agents', 'x402', 'paid api', 'usdc'],
-    body: 'Circle for Agents positions USDC as payment-as-authentication for agents and paid APIs. ARCOX aligns by exposing quote-before-execute MCP tools, ARCOX Pay invoice/payment request tools, and x402 real testnet Arc USDC memo payments. Current ARCOX execution remains public Arc Testnet USDC.',
+    body: 'Circle for Agents positions USDC as payment-as-authentication for agents and paid APIs. ARCOX aligns by exposing quote-before-execute MCP tools, ARCOX Pay invoice/payment request tools, and x402 real mainnet Arc USDC memo payments. Current ARCOX execution remains public Arc Mainnet USDC.',
   },
   {
     id: 'mcp-safety',
@@ -288,7 +288,7 @@ const tools = [
   },
   {
     name: 'arcox_wallet_balances',
-    description: 'Return all retail balances visible to the agent: EOA Arc tokens, Circle proxy wallet balances, and Solana Devnet USDC.',
+    description: 'Return all retail balances visible to the agent: EOA Arc tokens, Circle proxy wallet balances, and Solana USDC.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -353,12 +353,12 @@ const tools = [
   },
   {
     name: 'quote_unified_balance_deposit',
-    description: 'Preview a real testnet USDC deposit from the configured local signer into Circle Gateway Unified Balance. Does not transact.',
+    description: 'Preview a real mainnet USDC deposit from the configured local signer into Circle Gateway Unified Balance. Does not transact.',
     inputSchema: {
       type: 'object',
       properties: {
         amount: { type: 'string' },
-        chain: { type: 'string', enum: ['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'], default: 'Arc_Testnet' },
+        chain: { type: 'string', enum: ['Arc', 'Base', 'Ethereum', 'Arbitrum'], default: 'Arc' },
       },
       required: ['amount'],
       additionalProperties: false,
@@ -366,12 +366,12 @@ const tools = [
   },
   {
     name: 'deposit_unified_balance',
-    description: 'Execute a confirmed real testnet USDC Unified Balance deposit with the configured local signer. Requires previewId and explicit yes/ya.',
+    description: 'Execute a confirmed real mainnet USDC Unified Balance deposit with the configured local signer. Requires previewId and explicit yes/ya.',
     inputSchema: {
       type: 'object',
       properties: {
         amount: { type: 'string' },
-        chain: { type: 'string', enum: ['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'], default: 'Arc_Testnet' },
+        chain: { type: 'string', enum: ['Arc', 'Base', 'Ethereum', 'Arbitrum'], default: 'Arc' },
         previewId: { type: 'string' },
         confirmed: { type: 'boolean' },
         confirmationText: { type: 'string', enum: ['yes', 'ya'], description: 'Copy the user immediate explicit yes/ya reply after showing this preview.' },
@@ -459,7 +459,7 @@ const tools = [
   },
   {
     name: 'arcox_quote_bridge',
-    description: 'Quote a bridge route before execution. Supports USDC CCTP routes and native ETH from Ethereum/Base Sepolia to Arc via native swap bridge router. Circle Wallet source is only valid for USDC from Arc Testnet.',
+    description: 'Quote a bridge route before execution. Supports USDC CCTP v2 routes between mainnets; native ETH to Arc butuh router swap-native yang belum di-deploy di mainnet. Circle Wallet source is only valid for USDC from Arc Mainnet.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -532,7 +532,7 @@ const tools = [
   },
   {
     name: 'arcox_create_payment_request',
-    description: 'Create an ARCOX Pay USDC invoice/payment request on Arc Testnet.',
+    description: 'Create an ARCOX Pay USDC invoice/payment request on Arc Mainnet.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -616,7 +616,7 @@ const tools = [
       type: 'object',
       properties: {
         sourceChain: { type: 'string' },
-        destinationChain: { type: 'string', default: 'arc-testnet' },
+        destinationChain: { type: 'string', default: 'arc-mainnet' },
         sourceToken: { type: 'string', default: 'USDC' },
         destinationToken: { type: 'string', default: 'USDC' },
         amount: { type: 'string' },
@@ -841,7 +841,8 @@ const tools = [
 ]
 
 function routerDeployments() {
-  const path = join(agentRoot, 'deployments', 'arcox-router.testnet.json')
+  // Mainnet: catatan Fee Router (dan Swap Adapter) mainnet yang terverifikasi.
+  const path = join(agentRoot, 'deployments', 'fee-router-mainnet.json')
   if (!existsSync(path)) return {}
   try {
     return JSON.parse(readFileSync(path, 'utf8'))
@@ -852,7 +853,9 @@ function routerDeployments() {
 }
 
 function nativeSwapBridgeRouterDeployments() {
-  const path = join(agentRoot, 'deployments', 'arcox-native-swap-bridge-router.testnet.json')
+  // Router swap-native mainnet belum di-deploy (file tidak ada) → resource
+  // kosong dengan catatan, bukan data testnet.
+  const path = join(agentRoot, 'deployments', 'arcox-native-swap-bridge-router.mainnet.json')
   if (!existsSync(path)) return {}
   try {
     return JSON.parse(readFileSync(path, 'utf8'))
@@ -973,8 +976,8 @@ function routeStatus(args) {
   if (args.fromChain && !from) issues.push(`Unsupported fromChain: ${args.fromChain}`)
   if (args.toChain && !to) issues.push(`Unsupported toChain: ${args.toChain}`)
   if (action.includes('bridge') && fromChain && toChain && fromChain === toChain) issues.push('Bridge source and destination must differ.')
-  if (args.source === 'circle' && fromChain && !from?.circleWallet) issues.push('Circle Wallet source is only available on Arc Testnet.')
-  const solanaRoute = fromChain === 'Solana_Devnet' || toChain === 'Solana_Devnet'
+  if (args.source === 'circle' && fromChain && !from?.circleWallet) issues.push('Circle Wallet source is only available on Arc Mainnet.')
+  const solanaRoute = fromChain === 'Solana' || toChain === 'Solana'
   const usdcBridge = action.includes('bridge') && String(args.token || 'USDC').toUpperCase() === 'USDC'
   return {
     supported: issues.length === 0,
@@ -982,8 +985,8 @@ function routeStatus(args) {
     normalized: { fromChain: fromChain || null, toChain: toChain || null },
     fromChain: from || null,
     toChain: to || null,
-    routerFeeApplies: Boolean(usdcBridge && from?.router && fromChain !== 'Solana_Devnet'),
-    solanaPlatformFeeApplies: Boolean(usdcBridge && fromChain === 'Solana_Devnet'),
+    routerFeeApplies: Boolean(usdcBridge && from?.router && fromChain !== 'Solana'),
+    solanaPlatformFeeApplies: Boolean(usdcBridge && fromChain === 'Solana'),
     solanaRoute,
     terminalExecution: solanaRoute ? 'supported_with_local_solana_signer' : 'supported',
     safeNextStep: issues.length
@@ -1153,7 +1156,7 @@ function canonicalPreviewArgs(name, args) {
     return {
       action,
       amount: canonicalAmount(args.amount),
-      chain: normalizeMcpChain(args.chain || args.sourceChain) || args.chain || args.sourceChain || 'Arc_Testnet',
+      chain: normalizeMcpChain(args.chain || args.sourceChain) || args.chain || args.sourceChain || 'Arc',
       token: 'USDC',
     }
   }
@@ -1422,7 +1425,7 @@ async function rpcResponse(message) {
     if (name === 'arcox_execute_bridge') {
       const fromChain = normalizeMcpChain(args.fromChain)
       const toChain = normalizeMcpChain(args.toChain)
-      const fastSource = ['Arc_Testnet', 'Ethereum_Sepolia', 'Base_Sepolia', 'Arbitrum_Sepolia', 'HyperEVM_Testnet', 'Solana_Devnet'].includes(fromChain)
+      const fastSource = ['Arc', 'Ethereum', 'Base', 'Arbitrum', 'HyperEVM', 'Solana'].includes(fromChain)
       if (args.confirmed !== true) {
         const quoteArgs = { ...args, source: normalizeWalletSource(args.source || args.walletSource, 'eoa'), fromChain: fromChain || args.fromChain, toChain: toChain || args.toChain }
         return result(id, attachPreview('arcox_quote_bridge', quoteArgs, await quoteBridge(quoteArgs)))

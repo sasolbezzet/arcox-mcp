@@ -17,7 +17,7 @@ Edit `.env`:
 AGENT_PRIVATE_KEY=0xYOUR_LOCAL_AGENT_PRIVATE_KEY
 AGENT_NAME=ARCOX Codex Retail Agent
 AGENT_PORT=8787
-ARC_RPC=https://rpc.testnet.arc.network  # or the Canteen RPC from `arc-canteen rpc-url` (keep it in local env only)
+ARC_RPC=https://rpc.mainnet.arc.io  # or the Canteen RPC from `arc-canteen rpc-url` (keep it in local env only)
 ARCOX_API_URL=https://arcoxdex.vercel.app
 ARC_AGENT_ID=
 ```
@@ -93,7 +93,7 @@ npm run codex-agent -- "swap 10 USDC to EURC"
 Plan a bridge:
 
 ```bash
-npm run codex-agent -- "bridge 5 USDC from Arbitrum Sepolia to Arc"
+npm run codex-agent -- "bridge 5 USDC from Arbitrum to Arc"
 ```
 
 Swap and bridge are currently recognized as intents. CLI execution stays disabled until a route adapter returns quote, allowance, fee, route, and destination data.

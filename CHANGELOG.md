@@ -108,7 +108,7 @@
 
 ## 0.1.5
 
-- Add native ETH bridge quote/execution support from Ethereum Sepolia and Base Sepolia to Arc through `ArcoxNativeSwapBridgeRouter`.
+- Add native ETH bridge quote/execution support from Ethereum and Base to Arc through `ArcoxNativeSwapBridgeRouter`.
 - Add MCP native router deployment resource and native transaction safety limit `ARCOX_MAX_TX_NATIVE`.
 - Align MCP docs with Circle for Agents: USDC-native agent workflows, paid API/x402 readiness, and no live gas-free nanopayments claim.
 - Make MCP swap default to EOA agent wallet instead of Circle proxy wallet.
@@ -141,7 +141,7 @@
 - Initial public ARCOX MCP package for wallet balances, swap, bridge, send, history, retry bridge, route status, UI map, and agentic job tools.
 # 0.1.27
 
-- Bind new AI Router keys to an Arc Testnet API Pass SBT.
+- Bind new AI Router keys to an Arc Mainnet API Pass SBT.
 - Add signed short-lived API sessions and local OpenAI-compatible proxy support.
 - Add MCP tools for session creation, refresh, and API key status.
 # 0.1.28

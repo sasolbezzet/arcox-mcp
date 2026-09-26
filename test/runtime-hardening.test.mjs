@@ -26,8 +26,9 @@ test('Unified Balance adapter routes Arc SDK chain definitions through ARC_RPC',
   const end = source.indexOf('function normalizeUnifiedBalanceChain', start)
   assert.ok(start >= 0 && end > start)
   const implementation = source.slice(start, end)
-  assert.match(implementation, /chain\?\.id === arcTestnet\.id/)
-  assert.match(implementation, /chain\?\.chainId === arcTestnet\.id/)
+  // Mainnet: chain Arc SDK dipetakan ke definisi Arc mainnet lokal (arcMainnet).
+  assert.match(implementation, /chain\?\.id === arcMainnet\.id/)
+  assert.match(implementation, /chain\?\.chainId === arcMainnet\.id/)
   assert.match(implementation, /rpcTransport\(ARC_RPC\)/)
 })
 

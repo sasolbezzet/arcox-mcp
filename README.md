@@ -206,13 +206,13 @@ Server melayani beberapa gaya klien sekaligus:
 ## x402 / pembayaran Intel
 
 1. Endpoint ARCOX mengembalikan `402 Payment Required`.
-2. Agent menampilkan jumlah USDC Arc Testnet yang tepat + invoice + memo ID.
+2. Agent menampilkan jumlah USDC Arc Mainnet yang tepat + invoice + memo ID.
 3. User menyetujui.
 4. Agent membayar lewat Arc Transaction Memo dan memantau status invoice.
 5. Invoice `paid` membuka hasil Arkham melalui ARCOX API.
 
 Unified Balance / Circle Gateway adalah rail pembayaran; eksekusi MCP saat ini
-memakai USDC Arc Testnet publik. Jangan menyatakan nanopayments gas-free sudah
+memakai USDC Arc Mainnet publik. Jangan menyatakan nanopayments gas-free sudah
 live.
 
 ## CLI
@@ -248,5 +248,5 @@ npm test        # check + node --test test/*.test.mjs
 
 Alur OAuth/MSCA end-to-end diuji dari repo backend:
 `npm run test:e2e:flows` (passkey + EOA virtual, UserOperation nyata di Arc
-testnet), `npm run test:e2e:ui` (menu Plugin di Chrome nyata), dan
+mainnet), `npm run test:e2e:ui` (menu Plugin di Chrome nyata), dan
 `npm run diag:mcp` untuk diagnosa konektor.

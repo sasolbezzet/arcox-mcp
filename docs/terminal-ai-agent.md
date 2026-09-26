@@ -10,7 +10,7 @@ The hosted planner is the default UI endpoint. It works for all logged-in users 
 The agent has two modes:
 
 - HTTP endpoint mode for the ARCOX DEX UI.
-- Onchain command mode for Arc testnet jobs.
+- Onchain command mode for Arc mainnet jobs.
 
 ## Agent Wallet connection (recommended)
 
@@ -95,7 +95,7 @@ The endpoint accepts job prompts from the UI and returns:
 npm run agent -- status
 ```
 
-The wallet needs Arc testnet gas and USDC for actions that create, fund, submit, or complete jobs.
+The wallet needs Arc mainnet gas and USDC for actions that create, fund, submit, or complete jobs.
 
 ## Register Agent Identity
 
@@ -197,6 +197,6 @@ npm run agent -- serve --port 8787
 - Never commit `EOA_PRIVATE_KEY`, MSCA tokens, connection tokens, PAN, or CVV.
 - The backend trusts `mscaWalletAddress` from the OAuth token, not a user-supplied wallet label.
 - Owner vault routes require the passkey/SIWE session; an MCP bearer cannot link cards, change limits, or revoke another agent.
-- Use testnet-only keys for local EOA experiments. The remote Agent Wallet path does not require a private key in Hermes.
+- Use mainnet-only keys for local EOA experiments. The remote Agent Wallet path does not require a private key in Hermes.
 
 The hosted planner agent cannot approve, swap, bridge, send, submit, or complete using a user's wallet. It only creates structured intent. User-wallet actions must still be signed by the user in MetaMask or another wallet.

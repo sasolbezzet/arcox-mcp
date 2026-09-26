@@ -56,16 +56,16 @@ process.umask(0o077)
 loadLocalEnv()
 
 const ARC_RPC = resolveArcRpc({ preferCanteen: true })
-const EXPLORER_TX = 'https://testnet.arcscan.app/tx/'
+const EXPLORER_TX = 'https://explorer.arc.io/tx/'
 const AGENTIC_COMMERCE_CONTRACT = '0x0747EEf0706327138c69792bF28Cd525089e4583'
 const IDENTITY_REGISTRY = '0x8004A818BFB912233c491871b3d84c89A494BD9e'
 const ARC_USDC = '0x3600000000000000000000000000000000000000'
 const ARC_MEMO_CONTRACT = process.env.ARC_MEMO_CONTRACT || '0x5294E9927c3306DcBaDb03fe70b92e01cCede505'
-const TOKEN_MESSENGER_V2_EVM = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA'
-const MESSAGE_TRANSMITTER_V2_EVM = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275'
-const IRIS = 'https://iris-api-sandbox.circle.com'
-const SOLANA_DEVNET_RPC = process.env.SOLANA_DEVNET_RPC || 'https://api.devnet.solana.com'
-const SOLANA_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'
+const TOKEN_MESSENGER_V2_EVM = '0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d'
+const MESSAGE_TRANSMITTER_V2_EVM = '0x81D40F21F12A8F0E3252Bccb954D722d4c464B64'
+const IRIS = 'https://iris-api.circle.com'
+const SOLANA_MAINNET_RPC = process.env.SOLANA_MAINNET_RPC || 'https://api.mainnet-beta.solana.com'
+const SOLANA_USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 const SOLANA_TOKEN_MESSENGER_PROGRAM = 'CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe'
 const SOLANA_MESSAGE_TRANSMITTER_PROGRAM = 'CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC'
 const ARCOX_WEB_URL = process.env.ARCOX_WEB_URL || process.env.ARCOX_API_URL || 'https://arcoxdex.vercel.app'
@@ -87,8 +87,8 @@ const SEND_ESTIMATE_TIMEOUT_MS = Number(process.env.SEND_ESTIMATE_TIMEOUT_MS || 
 const RPC_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || '8000')
 const SOLANA_CONFIRM_TIMEOUT_MS = Number(process.env.SOLANA_CONFIRM_TIMEOUT_MS || '45000')
 const PLATFORM_FEE_BPS = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
-const ARC_APPKIT_ADAPTER = '0xBBD70b01a1CAbc96d5b7b129Ae1AAabdf50dd40b'
-const UNIFIED_BALANCE_CHAINS = new Set(['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'])
+const ARC_APPKIT_ADAPTER = '0x8bc25dB1feda8Fc5eB20d0117Ff1f965F2F4E29C'
+const UNIFIED_BALANCE_CHAINS = new Set(['Arc', 'Base', 'Ethereum', 'Arbitrum'])
 const SOLANA_FEE_TREASURY = process.env.SOLANA_FEE_TREASURY || '4kAf2Qxf9KnbnKo7ukPMMu8q1UButJYNik4yQtvWhExw'
 const AUTO_MINT_DIR = join(STATE_HOME, '.arcox-auto-mint')
 const TX_HISTORY_FILE = join(STATE_HOME, '.arcox-agent-history.json')
@@ -96,7 +96,7 @@ const AUTO_MINT_STALE_MS = Number(process.env.AUTO_MINT_STALE_MS || 5 * 60 * 100
 const AUTO_MINT_MAX_RECOVERIES = Number(process.env.AUTO_MINT_MAX_RECOVERIES || 3)
 const ARC_TOKENS = {
   USDC: { address: ARC_USDC, decimals: 6 },
-  EURC: { address: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a', decimals: 6 },
+  EURC: { address: '0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1', decimals: 6 },
   USYC: { address: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C', decimals: 6 },
   CIRBTC: { address: '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF', decimals: 8 },
 }
@@ -232,17 +232,17 @@ const memoAbi = [{
   outputs: [],
 }]
 
-const arcTestnet = defineChain({
-  id: 5042002,
-  name: 'Arc Testnet',
+const arcMainnet = defineChain({
+  id: 5042,
+  name: 'Arc Mainnet',
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
   rpcUrls: { default: { http: [ARC_RPC] } },
-  blockExplorers: { default: { name: 'ArcScan', url: 'https://testnet.arcscan.app' } },
+  blockExplorers: { default: { name: 'ArcScan', url: 'https://explorer.arc.io' } },
 })
 
 function rpcTransport(rpcUrl) {
   const drpcKey = process.env.DRPC_KEY || ''
-  const fallbackUrls = ['https://rpc.testnet.arc.network'].filter(u => u !== rpcUrl)
+  const fallbackUrls = ['https://rpc.mainnet.arc.io'].filter(u => u !== rpcUrl)
   const primaryOpts = { timeout: RPC_TIMEOUT_MS, retryCount: 1, ...(drpcKey && rpcUrl.includes('drpc.org') ? { fetchOptions: { headers: { Authorization: `Bearer ${drpcKey}` } } } : {}) }
   if (rpcUrl.includes('drpc.org') && !drpcKey) {
     // No DRPC key — skip DRPC, use public RPCs directly to avoid rate limit
@@ -254,7 +254,7 @@ function rpcTransport(rpcUrl) {
   ], { retryCount: 2, rank: false })
 }
 
-const publicClient = createPublicClient({ chain: arcTestnet, transport: rpcTransport(ARC_RPC) })
+const publicClient = createPublicClient({ chain: arcMainnet, transport: rpcTransport(ARC_RPC) })
 const routerDeployments = loadRouterDeployments()
 const nativeSwapBridgeDeployments = loadNativeSwapBridgeDeployments()
 
@@ -406,73 +406,73 @@ async function pullBackendHistory(owner) {
 }
 
 const cctpChains = {
-  Arc_Testnet: {
-    id: 'Arc_Testnet',
-    aliases: ['arc', 'arc testnet', 'arc_testnet'],
+  Arc: {
+    id: 'Arc',
+    aliases: ['arc', 'arc mainnet', 'arc_mainnet'],
     domain: 26,
     usdc: ARC_USDC,
     tokenMessenger: TOKEN_MESSENGER_V2_EVM,
     messageTransmitter: MESSAGE_TRANSMITTER_V2_EVM,
-    explorer: 'https://testnet.arcscan.app/tx/',
+    explorer: 'https://explorer.arc.io/tx/',
     rpc: ARC_RPC,
-    chain: arcTestnet,
+    chain: arcMainnet,
     fast: true,
   },
-  Ethereum_Sepolia: {
-    id: 'Ethereum_Sepolia',
-    aliases: ['ethereum', 'ethereum sepolia', 'eth sepolia', 'sepolia'],
+  Ethereum: {
+    id: 'Ethereum',
+    aliases: ['ethereum', 'ethereum mainnet', 'eth mainnet', 'mainnet'],
     domain: 0,
-    usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+    usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
     tokenMessenger: TOKEN_MESSENGER_V2_EVM,
     messageTransmitter: MESSAGE_TRANSMITTER_V2_EVM,
-    explorer: 'https://sepolia.etherscan.io/tx/',
-    rpc: process.env.ETHEREUM_SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com',
-    chain: defineChain({ id: 11155111, name: 'Ethereum Sepolia', nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [process.env.ETHEREUM_SEPOLIA_RPC || 'https://ethereum-sepolia-rpc.publicnode.com'] } }, blockExplorers: { default: { name: 'Etherscan', url: 'https://sepolia.etherscan.io' } } }),
+    explorer: 'https://etherscan.io/tx/',
+    rpc: process.env.ETHEREUM_MAINNET_RPC || 'https://ethereum-rpc.publicnode.com',
+    chain: defineChain({ id: 1, name: 'Ethereum', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [process.env.ETHEREUM_MAINNET_RPC || 'https://ethereum-rpc.publicnode.com'] } }, blockExplorers: { default: { name: 'Etherscan', url: 'https://etherscan.io' } } }),
     fast: true,
   },
-  Base_Sepolia: {
-    id: 'Base_Sepolia',
-    aliases: ['base', 'base sepolia'],
+  Base: {
+    id: 'Base',
+    aliases: ['base', 'base mainnet'],
     domain: 6,
-    usdc: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
     tokenMessenger: TOKEN_MESSENGER_V2_EVM,
     messageTransmitter: MESSAGE_TRANSMITTER_V2_EVM,
-    explorer: 'https://sepolia.basescan.org/tx/',
-    rpc: process.env.BASE_SEPOLIA_RPC || 'https://sepolia.base.org',
-    chain: defineChain({ id: 84532, name: 'Base Sepolia', nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [process.env.BASE_SEPOLIA_RPC || 'https://sepolia.base.org'] } }, blockExplorers: { default: { name: 'BaseScan', url: 'https://sepolia.basescan.org' } } }),
+    explorer: 'https://basescan.org/tx/',
+    rpc: process.env.BASE_MAINNET_RPC || 'https://mainnet.base.org',
+    chain: defineChain({ id: 8453, name: 'Base', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [process.env.BASE_MAINNET_RPC || 'https://mainnet.base.org'] } }, blockExplorers: { default: { name: 'BaseScan', url: 'https://basescan.org' } } }),
     fast: true,
   },
-  Arbitrum_Sepolia: {
-    id: 'Arbitrum_Sepolia',
-    aliases: ['arbitrum', 'arbitrum sepolia', 'arb sepolia'],
+  Arbitrum: {
+    id: 'Arbitrum',
+    aliases: ['arbitrum', 'arbitrum mainnet', 'arb mainnet'],
     domain: 3,
-    usdc: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
+    usdc: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     tokenMessenger: TOKEN_MESSENGER_V2_EVM,
     messageTransmitter: MESSAGE_TRANSMITTER_V2_EVM,
-    explorer: 'https://sepolia.arbiscan.io/tx/',
-    rpc: process.env.ARBITRUM_SEPOLIA_RPC || 'https://arbitrum-sepolia.publicnode.com',
-    chain: defineChain({ id: 421614, name: 'Arbitrum Sepolia', nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [process.env.ARBITRUM_SEPOLIA_RPC || 'https://arbitrum-sepolia.publicnode.com'] } }, blockExplorers: { default: { name: 'Arbiscan', url: 'https://sepolia.arbiscan.io' } } }),
+    explorer: 'https://arbiscan.io/tx/',
+    rpc: process.env.ARBITRUM_MAINNET_RPC || 'https://arb1.arbitrum.io/rpc',
+    chain: defineChain({ id: 42161, name: 'Arbitrum', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [process.env.ARBITRUM_MAINNET_RPC || 'https://arb1.arbitrum.io/rpc'] } }, blockExplorers: { default: { name: 'Arbiscan', url: 'https://arbiscan.io' } } }),
     fast: true,
   },
-  HyperEVM_Testnet: {
-    id: 'HyperEVM_Testnet',
-    aliases: ['hyperevm', 'hyper evm', 'hypevm', 'hype', 'hyperevm testnet'],
+  HyperEVM: {
+    id: 'HyperEVM',
+    aliases: ['hyperevm', 'hyper evm', 'hypevm', 'hype', 'hyperevm mainnet'],
     domain: 19,
-    usdc: '0x2B3370eE501B4a559b57D449569354196457D8Ab',
+    usdc: '0xb88339CB7199b77E23DB6E890353E22632Ba630f',
     tokenMessenger: TOKEN_MESSENGER_V2_EVM,
     messageTransmitter: MESSAGE_TRANSMITTER_V2_EVM,
-    explorer: 'https://app.hyperliquid-testnet.xyz/explorer/tx/',
-    rpc: process.env.HYPEREVM_TESTNET_RPC || 'https://rpc.hyperliquid-testnet.xyz/evm',
-    chain: defineChain({ id: 998, name: 'HyperEVM Testnet', nativeCurrency: { name: 'HYPE', symbol: 'HYPE', decimals: 18 }, rpcUrls: { default: { http: [process.env.HYPEREVM_TESTNET_RPC || 'https://rpc.hyperliquid-testnet.xyz/evm'] } }, blockExplorers: { default: { name: 'Hyperliquid', url: 'https://app.hyperliquid-testnet.xyz/explorer' } } }),
+    explorer: 'https://app.hyperliquid-mainnet.xyz/explorer/tx/',
+    rpc: process.env.HYPEREVM_MAINNET_RPC || 'https://rpc.hyperliquid-mainnet.xyz/evm',
+    chain: defineChain({ id: 998, name: 'HyperEVM', nativeCurrency: { name: 'HYPE', symbol: 'HYPE', decimals: 18 }, rpcUrls: { default: { http: [process.env.HYPEREVM_MAINNET_RPC || 'https://rpc.hyperliquid-mainnet.xyz/evm'] } }, blockExplorers: { default: { name: 'Hyperliquid', url: 'https://app.hyperliquid-mainnet.xyz/explorer' } } }),
     fast: true,
   },
-  Solana_Devnet: {
-    id: 'Solana_Devnet',
-    aliases: ['solana', 'solana devnet', 'solana_devnet', 'sol'],
+  Solana: {
+    id: 'Solana',
+    aliases: ['solana', 'solana mainnet', 'solana_mainnet', 'sol'],
     domain: 5,
-    usdc: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU',
+    usdc: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     explorer: 'https://explorer.solana.com/tx/',
-    rpc: process.env.SOLANA_DEVNET_RPC || 'https://api.devnet.solana.com',
+    rpc: process.env.SOLANA_MAINNET_RPC || 'https://api.mainnet-beta.solana.com',
     fast: true,
     solana: true,
   },
@@ -625,8 +625,8 @@ Usage:
   npm run agent -- identity
   npm run agent -- connect
   npm run agent -- run --prompt "send 1 USDC to 0x..." --yes
-  npm run agent -- run --prompt "bridge 5 USDC from Arbitrum Sepolia to Arc"
-  npm run agent -- run --prompt "retry bridge 0xBURN_TX from Arc to Arbitrum Sepolia" --yes
+  npm run agent -- run --prompt "bridge 5 USDC from Arbitrum to Arc"
+  npm run agent -- run --prompt "retry bridge 0xBURN_TX from Arc to Arbitrum" --yes
   npm run agent -- run --prompt "swap 10 USDC to EURC"
   npm run agent -- serve --port 8787
   npm run agent -- ask --prompt "Create escrow job for 1 USDC"
@@ -635,7 +635,7 @@ Usage:
   npm run agent -- read-agent --agent-id 1
   npm run agent -- create-job --provider 0x... --evaluator 0x... --description "..." --hours 24
   npm run agent -- read-job --job-id 1
-  npm run agent -- retry-bridge --burn-tx 0x... --from-chain Arc_Testnet --to-chain Arbitrum_Sepolia
+  npm run agent -- retry-bridge --burn-tx 0x... --from-chain Arc --to-chain Arbitrum
   npm run agent -- set-budget --job-id 1 --amount 1
   npm run agent -- fund --job-id 1 --amount 1
   npm run agent -- submit --job-id 1 --deliverable "proof text"
@@ -690,7 +690,7 @@ function envSecurityWarnings() {
 }
 
 function loadRouterDeployments() {
-  const path = join(AGENT_HOME, 'deployments', 'arcox-router.testnet.json')
+  const path = join(AGENT_HOME, 'deployments', 'arcox-router.mainnet.json')
   if (!existsSync(path)) return {}
   try {
     return JSON.parse(readFileSync(path, 'utf8')).deployments || {}
@@ -700,7 +700,7 @@ function loadRouterDeployments() {
 }
 
 function loadNativeSwapBridgeDeployments() {
-  const path = join(AGENT_HOME, 'deployments', 'arcox-native-swap-bridge-router.testnet.json')
+  const path = join(AGENT_HOME, 'deployments', 'arcox-native-swap-bridge-router.mainnet.json')
   if (!existsSync(path)) return {}
   try {
     return JSON.parse(readFileSync(path, 'utf8')).deployments || {}
@@ -885,7 +885,7 @@ function privateKey() {
 
 function wallet() {
   const account = privateKeyToAccount(privateKey())
-  const walletClient = createWalletClient({ account, chain: arcTestnet, transport: rpcTransport(ARC_RPC) })
+  const walletClient = createWalletClient({ account, chain: arcMainnet, transport: rpcTransport(ARC_RPC) })
   return { account, walletClient }
 }
 
@@ -926,7 +926,7 @@ async function quoteMscaSend(intent) {
     to: getAddress(intent.to),
     amount: String(intent.amount),
     token: normalizeArcTokenKey(intent.token || 'USDC'),
-    chain: intent.chain || intent.fromChain || 'arc-testnet',
+    chain: intent.chain || intent.fromChain || 'arc-mainnet',
     ...(configuredAddress ? { walletAddress: configuredAddress } : {}),
   }, token, SEND_ESTIMATE_TIMEOUT_MS)
   if (configuredAddress && quote.walletAddress && configuredAddress.toLowerCase() !== String(quote.walletAddress).toLowerCase()) {
@@ -946,7 +946,7 @@ async function executeMscaSend(intent) {
     to: getAddress(intent.to),
     amount: String(intent.amount),
     token: normalizeArcTokenKey(intent.token || 'USDC'),
-    chain: intent.chain || intent.fromChain || 'arc-testnet',
+    chain: intent.chain || intent.fromChain || 'arc-mainnet',
     previewId: String(intent.backendPreviewId || ''),
     confirmed: true,
     confirmationText: String(intent.confirmationText || '').trim().toLowerCase(),
@@ -996,7 +996,7 @@ function solanaKeypair() {
 }
 
 function solanaConnection() {
-  return new Connection(SOLANA_DEVNET_RPC, 'confirmed')
+  return new Connection(SOLANA_MAINNET_RPC, 'confirmed')
 }
 
 function hexToU8(hex) {
@@ -1061,8 +1061,8 @@ export function metadataFor(owner) {
       'complete_erc8183_job',
     ],
     chain: {
-      name: arcTestnet.name,
-      id: arcTestnet.id,
+      name: arcMainnet.name,
+      id: arcMainnet.id,
       rpc: ARC_RPC,
       identity_registry: IDENTITY_REGISTRY,
       agentic_commerce: AGENTIC_COMMERCE_CONTRACT,
@@ -1100,7 +1100,7 @@ export function normalizeChainName(value) {
 function extractBridgeRoute(text) {
   const value = String(text || '')
   const fromMatch = value.match(/\bfrom\s+(.+?)\s+to\s+(.+?)(?:\s+for\s+|\s+with\s+|$)/i)
-  if (!fromMatch) return { fromChain: 'Arc_Testnet', toChain: 'Ethereum_Sepolia' }
+  if (!fromMatch) return { fromChain: 'Arc', toChain: 'Ethereum' }
   return {
     fromChain: normalizeChainName(fromMatch[1]),
     toChain: normalizeChainName(fromMatch[2]),
@@ -1130,7 +1130,7 @@ function authMessage(address, issuedAt) {
     'Only sign this message on the official ARCOX DEX website.',
     `Address: ${getAddress(address)}`,
     `Issued At: ${issuedAt}`,
-    'Network: Arc Testnet',
+    'Network: Arc Mainnet',
   ].join('\n')
 }
 
@@ -1230,23 +1230,23 @@ export function serviceCatalog() {
     project: 'ARCOX DEX + ARCOX MCP',
     safety: 'All value-moving tools must quote/preview first and require user confirmation.',
     services: [
-      { name: 'wallet_balances', description: 'Read EOA Arc, Circle proxy wallet, and Solana Devnet balances.' },
+      { name: 'wallet_balances', description: 'Read EOA Arc, Circle proxy wallet, and Solana balances.' },
       { name: 'swap', description: 'Quote and execute supported Arc swaps with preview-before-execute.' },
-      { name: 'bridge', description: 'Quote and execute supported USDC CCTP testnet bridge routes; slow attestations use an automatic local auto-mint worker.' },
+      { name: 'bridge', description: 'Quote and execute supported USDC CCTP mainnet bridge routes; slow attestations use an automatic local auto-mint worker.' },
       { name: 'auto_mint_status', description: 'Use arcox_transaction_history to check local auto-mint worker status by burnTx. Returns status, mintTx, recovery count, and errors; read-only, no identity/API-key auth needed.' },
       { name: 'send', description: 'Quote and send supported Arc tokens from EOA or Circle wallet with confirmation.' },
       { name: 'bridge_retry', description: 'Retry mint for a completed burn transaction when attestation is ready.' },
       { name: 'arcox_pay', description: 'Create/check internal ARCOX Pay invoice/payment workflows.' },
-      { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode uses Arc Testnet USDC payment with Arc transaction memo reconciliation.' },
+      { name: 'intel_x402', description: 'ARCOX Intel via backend Arkham API. Real mode uses Arc Mainnet USDC payment with Arc transaction memo reconciliation.' },
       { name: 'ai_router', description: 'Check/deposit Unified Balance, enable or disable Auto Pay, create/delete API keys, list models, call models, and inspect usage.' },
-      { name: 'agentic_jobs', description: 'Plan/create/read/fund/submit/complete testnet Agentic Economy jobs.' },
+      { name: 'agentic_jobs', description: 'Plan/create/read/fund/submit/complete mainnet Agentic Economy jobs.' },
     ],
     examplePrompts: [
       'show all wallet balances',
       'quote bridge 1 usdc from arc to base',
       'check auto mint worker status for 0xBURN_TX',
       'send 1 eurc from eoa to 0x...',
-      'retry bridge 0xBURN_TX from arbitrum sepolia to arc',
+      'retry bridge 0xBURN_TX from arbitrum mainnet to arc',
       'quote swap 1 eurc to usdc',
       'create payment request 10 usdc to 0x...',
       'quote arkham wallet report for 0x...',
@@ -1306,7 +1306,7 @@ export async function getUnifiedBalance(input = {}) {
 
 export async function quoteUnifiedBalanceDeposit(input = {}) {
   const account = privateKeyToAccount(privateKey())
-  const chain = normalizeUnifiedBalanceChain(input.chain || input.sourceChain || 'Arc_Testnet')
+  const chain = normalizeUnifiedBalanceChain(input.chain || input.sourceChain || 'Arc')
   const amount = String(input.amount || '').trim()
   if (!/^\d+(\.\d+)?$/.test(amount) || Number(amount) <= 0) throw new Error('Deposit amount must be greater than zero.')
   return {
@@ -1464,7 +1464,7 @@ async function resolveAgentDelegateStatus(ownerAddress, delegateAddress, chain, 
 }
 
 function unifiedBalanceFundedChains(balance) {
-  const supported = new Set(['Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'])
+  const supported = new Set(['Arc', 'Base', 'Ethereum', 'Arbitrum'])
   return (balance?.breakdown || [])
     .flatMap(source => source?.breakdown || [])
     .filter(item => supported.has(item?.chain) && (Number(item?.confirmedBalance || 0) > 0 || Number(item?.pendingBalance || 0) > 0))
@@ -1545,8 +1545,8 @@ function unifiedBalanceKit() {
 
 function unifiedBalanceAdapter() {
   if (!agentUnifiedBalanceAdapter) {
-    const clientForChain = chain => (chain?.id === arcTestnet.id || chain?.chainId === arcTestnet.id)
-      ? { chain: arcTestnet, transport: rpcTransport(ARC_RPC) }
+    const clientForChain = chain => (chain?.id === arcMainnet.id || chain?.chainId === arcMainnet.id)
+      ? { chain: arcMainnet, transport: rpcTransport(ARC_RPC) }
       : { chain }
     agentUnifiedBalanceAdapter = createViemAdapterFromPrivateKey({
       privateKey: privateKey(),
@@ -1583,10 +1583,10 @@ function findTransactionHash(value, depth = 0) {
 
 function unifiedBalanceExplorer(chain, txHash) {
   const explorers = {
-    Arc_Testnet: EXPLORER_TX,
-    Base_Sepolia: 'https://sepolia.basescan.org/tx/',
-    Ethereum_Sepolia: 'https://sepolia.etherscan.io/tx/',
-    Arbitrum_Sepolia: 'https://sepolia.arbiscan.io/tx/',
+    Arc: EXPLORER_TX,
+    Base: 'https://basescan.org/tx/',
+    Ethereum: 'https://etherscan.io/tx/',
+    Arbitrum: 'https://arbiscan.io/tx/',
   }
   return `${explorers[chain] || EXPLORER_TX}${txHash}`
 }
@@ -2023,7 +2023,7 @@ function nativeTokenForChain(chainInfo) {
 }
 
 function isNativeBridgeIntent(token, fromInfo, toInfo) {
-  if (!fromInfo || !toInfo || toInfo.id !== 'Arc_Testnet') return false
+  if (!fromInfo || !toInfo || toInfo.id !== 'Arc') return false
   const bridgeToken = normalizeBridgeTokenKey(token)
   if (!['ETH', 'HYPE', 'SOL'].includes(bridgeToken)) return false
   return bridgeToken === nativeTokenForChain(fromInfo)
@@ -2033,7 +2033,7 @@ function assertNativeBridgeSupported({ token, source, fromInfo, toInfo }) {
   const bridgeToken = normalizeBridgeTokenKey(token)
   if (source === 'circle') throw new Error('Native bridge is only supported from the local EOA agent wallet. Circle Wallet source supports USDC only.')
   if (!isNativeBridgeIntent(bridgeToken, fromInfo, toInfo)) {
-    throw new Error(`Native ${bridgeToken} bridge is only supported from its source chain to Arc Testnet.`)
+    throw new Error(`Native ${bridgeToken} bridge is only supported from its source chain to Arc Mainnet.`)
   }
   if (fromInfo.solana) throw new Error('SOL-native bridge is not enabled in MCP. Current Solana route supports USDC only.')
   const router = nativeSwapBridgeRouterFor(fromInfo.id)
@@ -2205,16 +2205,16 @@ async function executeNativeBridge(intent, owner, fromInfo, toInfo) {
 }
 
 export async function executeBridge(intent, owner) {
-  if (!intent.amount || Number(intent.amount) <= 0) throw new Error('Bridge command needs amount, example: bridge 5 USDC from Arbitrum Sepolia to Arc')
+  if (!intent.amount || Number(intent.amount) <= 0) throw new Error('Bridge command needs amount, example: bridge 5 USDC from Arbitrum to Arc')
   const fromInfo = cctpChains[intent.fromChain]
   const toInfo = cctpChains[intent.toChain]
-  if (!fromInfo || !toInfo) throw new Error('Unsupported bridge route. Use Arc, Ethereum Sepolia, Base Sepolia, Arbitrum Sepolia, or HyperEVM Testnet.')
+  if (!fromInfo || !toInfo) throw new Error('Unsupported bridge route. Use Arc, Ethereum, Base, Arbitrum, or HyperEVM.')
   if (fromInfo.id === toInfo.id) throw new Error('Bridge source and destination must be different.')
   const bridgeToken = normalizeBridgeTokenKey(intent.token)
   if (isNativeBridgeIntent(bridgeToken, fromInfo, toInfo)) return executeNativeBridge({ ...intent, token: bridgeToken }, owner, fromInfo, toInfo)
   if (bridgeToken !== 'USDC') {
     const receiveToken = normalizeBridgeTokenKey(intent.receiveToken || intent.outputToken || 'USDC')
-    if (fromInfo.id !== 'Arc_Testnet') throw new Error('MCP multi-token bridge can only swap before bridge on Arc Testnet. For this source chain, bridge USDC directly.')
+    if (fromInfo.id !== 'Arc') throw new Error('MCP multi-token bridge can only swap before bridge on Arc Mainnet. For this source chain, bridge USDC directly.')
     if (receiveToken !== 'USDC') throw new Error('MCP receive-token swap after mint is not enabled yet. Receive USDC, then run a separate Arc swap.')
     const preSwap = await executeSwap({
       amount: intent.amount,
@@ -2515,7 +2515,7 @@ async function executeEvmToSolana(intent, owner, fromInfo, toInfo) {
         mintTx,
         approveExplorer: approval.approveHash ? fromInfo.explorer + approval.approveHash : undefined,
         burnExplorer: fromInfo.explorer + burnHash,
-        mintExplorer: `https://explorer.solana.com/tx/${mintTx}?cluster=devnet`,
+        mintExplorer: `https://explorer.solana.com/tx/${mintTx}?cluster=mainnet`,
         safeNextStep: 'Attestation siap dalam 20 detik; Solana mint selesai tanpa auto-mint worker.',
       }
     }
@@ -2570,7 +2570,7 @@ async function executeEvmToSolana(intent, owner, fromInfo, toInfo) {
     mintTx,
     approveExplorer: approval.approveHash ? fromInfo.explorer + approval.approveHash : undefined,
     burnExplorer: fromInfo.explorer + burnHash,
-    mintExplorer: `https://explorer.solana.com/tx/${mintTx}?cluster=devnet`,
+    mintExplorer: `https://explorer.solana.com/tx/${mintTx}?cluster=mainnet`,
   }
 }
 
@@ -2607,7 +2607,7 @@ async function executeSolanaToEvm(intent, owner, fromInfo, toInfo) {
         feeTreasury: burn.treasury,
         burnTx: burnHash,
         mintTx: mintHash,
-        burnExplorer: `https://explorer.solana.com/tx/${burnHash}?cluster=devnet`,
+        burnExplorer: `https://explorer.solana.com/tx/${burnHash}?cluster=mainnet`,
         mintExplorer: toInfo.explorer + mintHash,
         safeNextStep: 'Attestation siap dalam 20 detik; mint selesai tanpa auto-mint worker.',
       }
@@ -2620,7 +2620,7 @@ async function executeSolanaToEvm(intent, owner, fromInfo, toInfo) {
       owner,
       amount: intent.amount,
       burnHash,
-      burnExplorer: `https://explorer.solana.com/tx/${burnHash}?cluster=devnet`,
+      burnExplorer: `https://explorer.solana.com/tx/${burnHash}?cluster=mainnet`,
       solanaRecipient: solana.publicKey.toBase58(),
       safeNextStep: `Burn Solana selesai dengan platform fee ${burn.platformFee} USDC. Attestation belum siap setelah ${Math.round(AUTO_MINT_GRACE_WAIT_MS / 1000)} detik; agent auto-mint worker baru dijadwalkan.`,
     })
@@ -2650,7 +2650,7 @@ async function executeSolanaToEvm(intent, owner, fromInfo, toInfo) {
     feeTreasury: burn.treasury,
     burnTx: burnHash,
     mintTx: mintHash,
-    burnExplorer: `https://explorer.solana.com/tx/${burnHash}?cluster=devnet`,
+    burnExplorer: `https://explorer.solana.com/tx/${burnHash}?cluster=mainnet`,
     mintExplorer: toInfo.explorer + mintHash,
   }
 }
@@ -2701,7 +2701,7 @@ function pendingBridgeStepResult({ status, route, router, fromInfo, toInfo, owne
 export async function retryBridgeMint({ burnTx, fromChain, toChain }, owner) {
   const fromInfo = cctpChains[fromChain]
   const toInfo = cctpChains[toChain]
-  if (!fromInfo || !toInfo) throw new Error('Unsupported retry route. Use Arc, Ethereum Sepolia, Base Sepolia, Arbitrum Sepolia, HyperEVM Testnet, or Solana Devnet.')
+  if (!fromInfo || !toInfo) throw new Error('Unsupported retry route. Use Arc, Ethereum, Base, Arbitrum, HyperEVM, or Solana.')
   if (fromInfo.id === toInfo.id) throw new Error('Retry source and destination must be different.')
   if (fromInfo.solana && !/^[1-9A-HJ-NP-Za-km-z]{32,88}$/.test(burnTx || '')) throw new Error('Missing valid Solana burn tx signature.')
   if (!fromInfo.solana && !/^0x[0-9a-fA-F]{64}$/.test(burnTx || '')) throw new Error('Missing valid EVM burn tx 0x...')
@@ -2721,7 +2721,7 @@ export async function retryBridgeMint({ burnTx, fromChain, toChain }, owner) {
       solanaRecipient: solana.publicKey.toBase58(),
       burnTx,
       mintTx,
-      mintExplorer: `https://explorer.solana.com/tx/${mintTx}?cluster=devnet`,
+      mintExplorer: `https://explorer.solana.com/tx/${mintTx}?cluster=mainnet`,
     }
   }
 
@@ -2816,7 +2816,7 @@ export async function executeSend(intent, owner) {
   const token = ARC_TOKENS[intent.token]
   if (!token) throw new Error(`Unsupported Arc token: ${intent.token}`)
   const value = parseUnits(intent.amount, token.decimals)
-  const router = routerFor('Arc_Testnet')
+  const router = routerFor('Arc')
   const { walletClient } = wallet()
   let approveTx = ''
   let hash
@@ -3247,11 +3247,11 @@ export async function quoteBridge(intent) {
   const toInfo = cctpChains[toChain]
   if (!fromInfo || !toInfo) throw new Error('Unsupported bridge route.')
   if (fromInfo.id === toInfo.id) throw new Error('Bridge source and destination must be different.')
-  if (source === 'circle' && fromInfo.id !== 'Arc_Testnet') throw new Error('Circle Wallet bridge source is only supported from Arc Testnet. Use source="eoa" for other source chains.')
+  if (source === 'circle' && fromInfo.id !== 'Arc') throw new Error('Circle Wallet bridge source is only supported from Arc Mainnet. Use source="eoa" for other source chains.')
   if (isNativeBridgeIntent(token, fromInfo, toInfo)) return quoteNativeBridgeRoute({ ...intent, token }, account.address, fromInfo, toInfo, source)
   if (token !== 'USDC') {
     const receiveToken = normalizeBridgeTokenKey(intent.receiveToken || intent.outputToken || 'USDC')
-    if (fromInfo.id !== 'Arc_Testnet') throw new Error('MCP multi-token bridge can only swap before bridge on Arc Testnet. For this source chain, bridge USDC directly.')
+    if (fromInfo.id !== 'Arc') throw new Error('MCP multi-token bridge can only swap before bridge on Arc Mainnet. For this source chain, bridge USDC directly.')
     if (receiveToken !== 'USDC') throw new Error('MCP receive-token swap after mint is not enabled yet. Receive USDC, then run a separate Arc swap.')
     const authToken = await backendSession(account)
     const apiTokenIn = apiArcTokenKey(token)
@@ -3445,7 +3445,7 @@ export async function quoteSend(intent) {
     }
   }
   const amount = parseUnits(String(intent.amount), token.decimals)
-  const router = routerFor('Arc_Testnet')
+  const router = routerFor('Arc')
   const [balance, routerQuote] = await Promise.all([
     publicClient.readContract({ address: token.address, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }).catch(() => 0n),
     router
@@ -3573,7 +3573,7 @@ export async function executeConfirmedBridge(intent) {
   let prepareTx = ''
   let prepareExplorer = ''
   if (source === 'circle') {
-    if (fromChain !== 'Arc_Testnet') throw new Error('Circle Wallet bridge source is only supported from Arc Testnet.')
+    if (fromChain !== 'Arc') throw new Error('Circle Wallet bridge source is only supported from Arc Mainnet.')
     const authToken = await backendSession(account)
     const prepared = await postJson('/api/prepare-bridge', {
       metamaskAddress: account.address,
@@ -3720,7 +3720,7 @@ function assertPayableInvoice(invoice) {
   if (invoice.status === 'expired') throw new Error('Invoice expired.')
   if (invoice.status === 'cancelled' || invoice.status === 'failed') throw new Error(`Invoice status is ${invoice.status}.`)
   if (Date.now() > new Date(invoice.expiresAt).getTime()) throw new Error('Invoice expired.')
-  if (invoice.token !== 'USDC' || invoice.network !== 'arc-testnet') throw new Error('Only USDC invoices on arc-testnet are supported.')
+  if (invoice.token !== 'USDC' || invoice.network !== 'arc-mainnet') throw new Error('Only USDC invoices on arc-mainnet are supported.')
 }
 
 export async function createPaymentRequest(input = {}) {
@@ -3728,7 +3728,7 @@ export async function createPaymentRequest(input = {}) {
     orderId: input.orderId,
     amount: String(input.amount || ''),
     token: input.token || 'USDC',
-    network: input.network || 'arc-testnet',
+    network: input.network || 'arc-mainnet',
     merchantAddress: getAddress(input.merchantAddress),
     memo: input.memo,
     expiresInMinutes: input.expiresInMinutes || 15,
@@ -3901,7 +3901,7 @@ export async function x402PayInvoice(input = {}) {
       amount,
       token: 'USDC',
       recipient: invoice.recipient,
-      sourceOptions: ['auto', 'Arc_Testnet', 'Base_Sepolia', 'Ethereum_Sepolia', 'Arbitrum_Sepolia'],
+      sourceOptions: ['auto', 'Arc', 'Base', 'Ethereum', 'Arbitrum'],
       safeNextStep: `Open https://arcoxdex.vercel.app/intel or /pay/status, choose Pay with Unified Balance, estimate first, then spend. MCP cannot sign Circle AppKit Unified Balance from terminal without a browser wallet session.`,
     }
   }
@@ -3917,7 +3917,7 @@ export async function x402PayInvoice(input = {}) {
       memoContract: invoice.memoContract || ARC_MEMO_CONTRACT,
       memoId: invoice.memoId,
       paymentMethods: ['arc_memo', 'unified_balance'],
-      instruction: `Confirm to pay ${amount} USDC on Arc Testnet to ${invoice.recipient} for ${invoice.invoiceId} using Arc transaction memo.`,
+      instruction: `Confirm to pay ${amount} USDC on Arc Mainnet to ${invoice.recipient} for ${invoice.invoiceId} using Arc transaction memo.`,
     }
   }
   if (input.mcpPreviewVerified !== true) {
@@ -3984,7 +3984,7 @@ export async function intelQuoteWalletReport(input = {}) {
     resource: `/api/intel/report/address/${encodeURIComponent(address)}`,
     amount: process.env.ARCOX_INTEL_PRICE_REPORT_ADDRESS || '0.05',
     asset: 'USDC',
-    network: 'arc-testnet',
+    network: 'arc-mainnet',
     requiresUserConfirmation: true,
     instruction: 'This Arkham analysis requires an ARCOX x402 invoice. First request returns exact USDC amount and Circle treasury address. Continue?',
     backend: ARCOX_API_BASE_URL,

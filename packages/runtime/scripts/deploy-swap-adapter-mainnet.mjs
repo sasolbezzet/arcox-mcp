@@ -211,12 +211,22 @@ const previousByChain = new Map((previous.chains || []).map((entry) => [entry.ch
 const mergedChains = results.map((entry) => {
   const before = previousByChain.get(entry.chain)
   if (!before) return entry
+  const proxy = entry.proxy || before.proxy || null
+  const implementation = entry.implementation || before.implementation || null
+  // Bukti verifikasi hanya dipertahankan kalau alamatnya masih kontrak yang sama;
+  // kalau ada deploy baru di chain ini, hasil verifikasi lama sudah tidak relevan.
+  const sameContracts = proxy === (before.proxy || null) && implementation === (before.implementation || null)
   return {
     ...entry,
-    proxy: entry.proxy || before.proxy || null,
-    implementation: entry.implementation || before.implementation || null,
+    proxy,
+    implementation,
     proxyDeployTx: entry.proxyDeployTx || before.proxyDeployTx || null,
     implDeployTx: entry.implDeployTx || before.implDeployTx || null,
+    // Hasil verifikasi (on-chain + Sourcify) dipertahankan; run deploy tidak
+    // boleh menghapus bukti yang sudah dikumpulkan verify-swap-adapter-mainnet.
+    readBack: entry.readBack || (sameContracts ? before.readBack : null) || null,
+    verified: entry.verified || (sameContracts ? before.verified : null) || null,
+    sourcify: entry.sourcify || (sameContracts ? before.sourcify : null) || null,
   }
 })
 for (const [chain, before] of previousByChain) if (!mergedChains.some((e) => e.chain === chain)) mergedChains.push(before)

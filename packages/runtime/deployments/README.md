@@ -77,52 +77,89 @@ npm run mainnet:fee-router:verify
 npm run mainnet:fee-router:verify-sources
 ```
 
-## Swap Adapter — belum di-deploy, menunggu dana + keputusan
+## Swap Adapter (proxy `TransparentUpgradeableProxy` + impl `Adapter`)
 
-Rencana ada di `scripts/deploy-swap-adapter-mainnet.mjs` (dry-run default).
+**Kontrak `Adapter` tidak punya treasury maupun fee.** Fungsinya hanya eksekusi
+batch swap dengan tanda tangan EIP-712; parameter init-nya
+`initialize(address owner_, address signer_, uint256 signerThreshold_)`. Treasury 5%
+ada di Fee Router, bukan di sini — jadi alamat treasury tidak bisa dipasang ke
+kontrak ini. Alamat yang dipakai sistem adalah **proxy**; implementation hanya
+di-deploy sekali per chain. Konstruktor proxy `(_logic, initialOwner, _data)`: OZ
+membuat ProxyAdmin baru milik `initialOwner`, dan `_data` adalah panggilan
+`initialize` yang di-delegate.
 
-Yang perlu diketahui sebelum menjalankan:
-
-- **Kontrak `Adapter` tidak punya treasury maupun fee.** Fungsinya hanya eksekusi
-  batch swap dengan tanda tangan EIP-712. Parameter init-nya
-  `initialize(address owner_, address signer_, uint256 signerThreshold_)`.
-  Treasury 5% ada di Fee Router, bukan di sini — jadi alamat treasury tidak bisa
-  dipasang ke kontrak ini.
-- Alamat yang dipakai sistem adalah **proxy**; implementation-nya hanya di-deploy
-  sekali per chain.
-- Konstruktor proxy `(_logic, initialOwner, _data)`: OZ membuat ProxyAdmin baru
-  milik `initialOwner`, dan `_data` adalah panggilan `initialize` yang di-delegate.
-- Estimasi gas untuk proxy **tidak mungkin** dilakukan sebelum implementation ada
-  (delegatecall ke alamat tanpa kode selalu revert), jadi script memakai limit
-  tetap 1,2 juta gas kecuali implementation sudah ter-deploy.
-
-Parameter yang sudah diputuskan operator (tercatat di `swap-adapter-mainnet.json`):
+### Arc Mainnet (5042) — SUDAH ter-deploy
 
 | Peran | Alamat |
 | --- | --- |
+| Alamat aktif aplikasi (**proxy**) | `0x8bc25dB1feda8Fc5eB20d0117Ff1f965F2F4E29C` |
+| Implementation (`Adapter`) | `0xA6EeE6c972825f7d746673D9a1E25Ca58BD11274` |
+| ProxyAdmin (hak upgrade) | `0x881037816Da1Cd38Ebe1d88250d3ddaEA994a4EA` |
 | `owner` adapter | `0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F` |
-| Pemilik ProxyAdmin (hak upgrade) | `0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F` |
+| Pemilik ProxyAdmin | `0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F` |
 | Signer EIP-712 (threshold 1) | `0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e` |
+
+Deploy tx: impl `0x624359d08f849eef15cf9613cc2477e02b0275c2f22f6c6b2de35709266ac92b`,
+proxy `0xd46509ed6eb9a6e7601799ed5b942a05b406b0767360e2fcfef1dd46f1a21cf9`.
+
+Bukti verifikasi (`npm run mainnet:swap-adapter:verify`) — semuanya lulus:
+
+- kode on-chain: proxy 813 byte, implementation 17.729 byte;
+- slot EIP-1967 implementation & admin menunjuk alamat di atas, dan
+  `ProxyAdmin.owner()` = `0x5d16E8Ef…`;
+- state lewat proxy: `owner` = `0x5d16E8Ef…`, `signerThreshold` = 1,
+  `isSigner(0xE34FF1D2…)` = true, `paused` = false, `pendingOwner` = 0x0;
+- implementation mentah belum pernah di-`initialize` (`owner()` = 0x0) → tidak bisa
+  dipakai sebagai backdoor;
+- bytecode on-chain identik dengan kompilasi ulang snapshot sumber (solc 0.8.28,
+  optimizer 200, viaIR, evmVersion paris), dan `creation-bytecode.txt` di disk juga
+  identik dengan hasil kompilasi ulang;
+- Sourcify `exact_match` untuk implementation dan proxy:
+  `https://repo.sourcify.dev/5042/0xa6eee6c972825f7d746673d9a1e25ca58bd11274`,
+  `https://repo.sourcify.dev/5042/0x8bc25db1feda8fc5eb20d0117ff1f965f2f4e29c`.
 
 > Catatan risiko: owner + ProxyAdmin dipegang `0x5d16E8Ef…`, dan key alamat itu
 > **tidak** ada di VPS ini. Selama key itu tidak tersedia, adapter tidak bisa
 > ditambah signer atau di-upgrade. Key signer (`0xE34FF1D2…`) tersedia, jadi
 > eksekusi swap tetap bisa jalan.
 
-Kebutuhan dana (gas impl ≈ 3,94 juta + proxy ≈ 0,95 juta):
+### Base & Arbitrum — belum di-deploy (kekurangan dana gas)
 
-| Chain | Perkiraan biaya | Saldo sekarang | Kurang | Saran kirim |
-| --- | --- | --- | --- | --- |
-| Arc | ≈0,098 USDC | 0,0513 USDC | ≈0,047 USDC | 1 USDC |
-| Base | ≈0,0000293 ETH | 0,0000115 ETH | ≈0,000018 ETH | 0,0005 ETH |
-| Arbitrum | ≈0,0000978 ETH | 0,0000051 ETH | ≈0,000093 ETH | 0,001 ETH |
+Estimasi biaya: implementation ≈ 3,94 juta gas + proxy ≈ 0,87–1,0 juta gas.
 
-Belum ada transaksi adapter yang dikirim — preflight berhenti di gerbang dana.
+| Chain | Perkiraan biaya | Saldo terakhir | Kurang |
+| --- | --- | --- | --- |
+| Base | ≈0,0000293 ETH | 0,0000115 ETH | ≈0,000018 ETH |
+| Arbitrum | ≈0,0000978 ETH | 0,0000051 ETH | ≈0,000093 ETH |
+
+### Perintah
 
 ```bash
+cd arcox-mcp/packages/runtime
+
+# dry-run (default) — tambahkan --broadcast untuk mengirim
 npm run mainnet:swap-adapter:deploy -- \
   --key-file ~/.arcox/agent.env:EOA_PRIVATE_KEY \
-  --adapter-owner <alamat> --signer <alamat> --signer-threshold 1 \
-  --proxy-admin-owner <alamat> --chains arc,base,arbitrum
-# tambahkan --broadcast untuk mengirim
+  --adapter-owner 0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F \
+  --signer 0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e --signer-threshold 1 \
+  --proxy-admin-owner 0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F \
+  --chains arc
+
+# verifikasi (read-only; --sourcify mempublikasikan sumber ke Sourcify)
+npm run mainnet:swap-adapter:verify -- --chains arc --sourcify
 ```
+
+Catatan: estimasi gas proxy **tidak mungkin** dilakukan sebelum implementation ada
+(delegatecall ke alamat tanpa kode selalu revert), jadi script memakai limit tetap
+1,2 juta gas (×1,15) kecuali implementation sudah ter-deploy. Referensi nyata:
+deploy proxy testnet memakai 872.864 gas.
+
+## Fee Router vs Swap Adapter — ringkas
+
+| | Fee Router (`ArcoxRouter`) | Swap Adapter (proxy `Adapter`) |
+| --- | --- | --- |
+| Treasury + fee 5% | ya (`feeBps` 500) | tidak |
+| Per chain | Arc, Base, Arbitrum (semua ter-deploy) | Arc (ter-deploy); Base/Arbitrum belum |
+| Verifikasi | `mainnet:fee-router:verify` | `mainnet:swap-adapter:verify` |
+| Sumber | `mainnet:fee-router:verify-sources` | `--sourcify` pada verify adapter |
+| Env var | `ARCOX_FEE_ROUTER_ADDRESS_MAINNET` | `ARCOX_SWAP_ADAPTER_MAINNET` |

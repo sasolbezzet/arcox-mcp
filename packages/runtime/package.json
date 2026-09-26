@@ -17,6 +17,7 @@
     "verify:router": "node scripts/verify-router.mjs",
     "mainnet:sources": "node scripts/fetch-verified-sources.mjs",
     "mainnet:plan": "node scripts/plan-mainnet-deploy.mjs",
+    "mainnet:addresses": "node scripts/list-mainnet-deployments.mjs",
     "mainnet:balances": "node scripts/check-mainnet-balances.mjs",
     "mainnet:gateway-balances": "node scripts/check-gateway-balances.mjs",
     "mainnet:fee-router:deploy": "node scripts/deploy-fee-router-mainnet.mjs",
@@ -24,6 +25,7 @@
     "mainnet:fee-router:verify": "node scripts/verify-fee-router-mainnet.mjs",
     "mainnet:fee-router:verify-sources": "node scripts/verify-sources-sourcify.mjs",
     "mainnet:swap-adapter:deploy": "node scripts/deploy-swap-adapter-mainnet.mjs",
-    "check:mainnet": "node --check scripts/deploy-fee-router-mainnet.mjs && node --check scripts/deploy-swap-adapter-mainnet.mjs && node --check scripts/set-fee-router-domains.mjs && node --check scripts/verify-fee-router-mainnet.mjs && node --check scripts/verify-sources-sourcify.mjs && node --check scripts/fetch-verified-sources.mjs && node --check scripts/check-mainnet-balances.mjs && node --check scripts/check-gateway-balances.mjs"
+    "mainnet:swap-adapter:verify": "node scripts/verify-swap-adapter-mainnet.mjs",
+    "check:mainnet": "node --check scripts/deploy-fee-router-mainnet.mjs && node --check scripts/deploy-swap-adapter-mainnet.mjs && node --check scripts/set-fee-router-domains.mjs && node --check scripts/verify-fee-router-mainnet.mjs && node --check scripts/verify-swap-adapter-mainnet.mjs && node --check scripts/verify-sources-sourcify.mjs && node --check scripts/fetch-verified-sources.mjs && node --check scripts/check-mainnet-balances.mjs && node --check scripts/check-gateway-balances.mjs && node --check scripts/list-mainnet-deployments.mjs"
   }
 }

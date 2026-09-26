@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-25T16:12:19.960Z",
-  "broadcast": false,
+  "generatedAt": "2026-09-26T02:43:03.749Z",
+  "broadcast": true,
   "deployer": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
   "adapterOwner": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
   "signer": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
@@ -21,22 +21,57 @@
       "name": "Arc Mainnet",
       "chainId": 5042,
       "explorer": "https://explorer.arc.io",
-      "dryRun": true,
+      "dryRun": false,
       "adapterOwner": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
       "signer": "0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e",
       "signerThreshold": 1,
       "proxyAdminOwner": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
-      "implementation": null,
-      "proxy": null,
-      "implDeployTx": null,
-      "proxyDeployTx": null,
-      "error": "saldo deployer tidak cukup",
+      "implementation": "0xa6eee6c972825f7d746673d9a1e25ca58bd11274",
+      "proxy": "0x8bc25db1feda8fc5eb20d0117ff1f965f2f4e29c",
+      "implDeployTx": "0x624359d08f849eef15cf9613cc2477e02b0275c2f22f6c6b2de35709266ac92b",
+      "proxyDeployTx": "0xd46509ed6eb9a6e7601799ed5b942a05b406b0767360e2fcfef1dd46f1a21cf9",
+      "error": null,
       "implGasEstimate": "3941329",
       "proxyGasEstimate": "1200000",
       "gasPriceWei": "20100000000",
-      "balance": "0.05132734",
+      "balance": "0.25132734",
       "reserved": "0.148552266",
-      "funded": false
+      "funded": true,
+      "readBack": {
+        "owner": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+        "signerThreshold": 1,
+        "signerRegistered": true
+      },
+      "verified": {
+        "checkedAt": "2026-09-26T02:47:12.613Z",
+        "chainId": 5042,
+        "proxyCodeBytes": 813,
+        "implCodeBytes": 17729,
+        "implementationSlot": "0xA6EeE6c972825f7d746673D9a1E25Ca58BD11274",
+        "adminSlot": "0x881037816Da1Cd38Ebe1d88250d3ddaEA994a4EA",
+        "proxyAdminOwner": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+        "owner": "0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F",
+        "signerThreshold": 1,
+        "signerRegistered": true,
+        "implBytecodeMatch": true,
+        "proxyBytecodeMatch": true
+      },
+      "sourcify": {
+        "implementation": {
+          "status": "exact_match",
+          "creationMatch": "exact_match",
+          "runtimeMatch": "exact_match",
+          "repoUrl": "https://repo.sourcify.dev/5042/0xa6eee6c972825f7d746673d9a1e25ca58bd11274",
+          "checkedAt": "2026-09-26T02:47:23.178Z"
+        },
+        "proxy": {
+          "status": "exact_match",
+          "creationMatch": "exact_match",
+          "runtimeMatch": "exact_match",
+          "repoUrl": "https://repo.sourcify.dev/5042/0x8bc25db1feda8fc5eb20d0117ff1f965f2f4e29c",
+          "checkedAt": "2026-09-26T02:47:28.894Z"
+        }
+      }
     },
     {
       "chain": "base",
@@ -82,5 +117,6 @@
       "reserved": "0.0001524940456025",
       "funded": false
     }
-  ]
+  ],
+  "updatedAt": "2026-09-26T02:47:28.894Z"
 }
