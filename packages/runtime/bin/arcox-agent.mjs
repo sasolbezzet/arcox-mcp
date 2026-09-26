@@ -94,13 +94,17 @@ const AUTO_MINT_DIR = join(STATE_HOME, '.arcox-auto-mint')
 const TX_HISTORY_FILE = join(STATE_HOME, '.arcox-agent-history.json')
 const AUTO_MINT_STALE_MS = Number(process.env.AUTO_MINT_STALE_MS || 5 * 60 * 1000)
 const AUTO_MINT_MAX_RECOVERIES = Number(process.env.AUTO_MINT_MAX_RECOVERIES || 3)
+// Token Arc mainnet yang terverifikasi on-chain. cirBTC belum ada di mainnet,
+// jadi entrinya diisi hanya kalau operator menaruh alamat mainnet lewat env.
 const ARC_TOKENS = {
   USDC: { address: ARC_USDC, decimals: 6 },
   EURC: { address: '0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1', decimals: 6 },
-  USYC: { address: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C', decimals: 6 },
-  CIRBTC: { address: '0xf0C4a4CE82A5746AbAAd9425360Ab04fbBA432BF', decimals: 8 },
+  USYC: { address: '0x8a5D989Bbb96929F689B0200f435f53dA42bF490', decimals: 6 },
+  ...(process.env.CIRBTC_TOKEN_ADDRESS ? { CIRBTC: { address: process.env.CIRBTC_TOKEN_ADDRESS, decimals: 8 } } : {}),
 }
-const CIRBTC_AMM_ROUTER = process.env.CIRBTC_AMM_ROUTER || '0x9f2443691bddd8343590c68e2a2cdec5fd0b6124'
+// Router AMM mainnet belum di-deploy; tanpa alamat eksplisit, jalur cirBTC
+// gagal-tertutup dengan pesan jelas (bukan memakai alamat testnet).
+const CIRBTC_AMM_ROUTER = process.env.CIRBTC_AMM_ROUTER || ''
 const cirBtcRouterAbi = [
   { type: 'function', name: 'getAmountOut', stateMutability: 'view', inputs: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'amountIn', type: 'uint256' }], outputs: [{ name: '', type: 'uint256' }] },
   { type: 'function', name: 'swapWithFee', stateMutability: 'nonpayable', inputs: [{ name: 'tokenIn', type: 'address' }, { name: 'tokenOut', type: 'address' }, { name: 'amountIn', type: 'uint256' }, { name: 'minAmountOut', type: 'uint256' }], outputs: [{ name: 'amountOut', type: 'uint256' }] },
@@ -108,11 +112,20 @@ const cirBtcRouterAbi = [
 ]
 function isCirBtcSwap(tokenIn, tokenOut) {
   // Only USDC↔cirBTC goes through AMM router. EURC↔cirBTC uses Circle API path.
+  // Mainnet: cirBTC (dan router AMM-nya) belum ada, jadi jalur ini mati kecuali
+  // operator menyetel CIRBTC_TOKEN_ADDRESS + CIRBTC_AMM_ROUTER.
+  if (!ARC_TOKENS.CIRBTC || !CIRBTC_AMM_ROUTER) return false
   return (tokenIn === 'USDC' && tokenOut === 'CIRBTC') || (tokenIn === 'CIRBTC' && tokenOut === 'USDC')
 }
 // RouterV2: EURC↔cirBTC routes through USDC pool internally (2-hop multicall).
 // All cirBTC liquidity comes from one USDC-cirBTC pool → rate consistency.
+async function assertCirBtcRouteReady() {
+  if (!ARC_TOKENS.CIRBTC || !CIRBTC_AMM_ROUTER) {
+    throw new Error('cirBTC/AMM router belum tersedia di Arc mainnet (set CIRBTC_TOKEN_ADDRESS dan CIRBTC_AMM_ROUTER untuk mengaktifkan).')
+  }
+}
 async function quoteCirBtcAmmSwap(tokenIn, tokenOut, amountIn) {
+  await assertCirBtcRouteReady()
   const tokenInAddr = ARC_TOKENS[tokenIn].address
   const tokenOutAddr = ARC_TOKENS[tokenOut].address
   const amountUnits = parseUnits(amountIn, ARC_TOKENS[tokenIn].decimals)
@@ -121,7 +134,8 @@ async function quoteCirBtcAmmSwap(tokenIn, tokenOut, amountIn) {
     args: [tokenInAddr, tokenOutAddr, amountUnits],
   })
   const amountOutDecimal = formatUnits(amountOut, ARC_TOKENS[tokenOut].decimals)
-  const feeBps = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
+  // Fee Router mainnet di-deploy dengan feeBps 500 (5%).
+  const feeBps = Number(process.env.ARCOX_ROUTER_FEE_BPS || '500')
   const feeAmount = (Number(amountIn) * feeBps / 10000).toFixed(ARC_TOKENS[tokenIn].decimals)
   return {
     available: true,
@@ -136,6 +150,7 @@ async function quoteCirBtcAmmSwap(tokenIn, tokenOut, amountIn) {
   }
 }
 async function executeCirBtcAmmSwap(tokenIn, tokenOut, amountIn) {
+  await assertCirBtcRouteReady()
   const { walletClient, account } = wallet()
   const tokenInAddr = ARC_TOKENS[tokenIn].address
   const tokenOutAddr = ARC_TOKENS[tokenOut].address
