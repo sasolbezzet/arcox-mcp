@@ -87,7 +87,12 @@ const SEND_ESTIMATE_TIMEOUT_MS = Number(process.env.SEND_ESTIMATE_TIMEOUT_MS || 
 const RPC_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || '8000')
 const SOLANA_CONFIRM_TIMEOUT_MS = Number(process.env.SOLANA_CONFIRM_TIMEOUT_MS || '45000')
 const PLATFORM_FEE_BPS = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
-const ARC_APPKIT_ADAPTER = '0x8bc25dB1feda8Fc5eB20d0117Ff1f965F2F4E29C'
+// Fallback hanya kalau backend tidak mengirim adapterContract. Alamat ini WAJIB
+// adapter milik Circle (ADAPTER_CONTRACT_EVM_MAINNET di
+// `@circle-fin/provider-stablecoin-service-swap`): Stablecoin Service menandatangani
+// ExecutionParams di domain EIP-712 adapter tersebut, jadi proxy self-deployed
+// (mis. 0x8bc25dB1…) selalu ditolak `InvalidSignature()` setelah approve.
+const ARC_APPKIT_ADAPTER = '0x7FB8c7260b63934d8da38aF902f87ae6e284a845'
 const UNIFIED_BALANCE_CHAINS = new Set(['Arc', 'Base', 'Ethereum', 'Arbitrum'])
 const SOLANA_FEE_TREASURY = process.env.SOLANA_FEE_TREASURY || '4kAf2Qxf9KnbnKo7ukPMMu8q1UButJYNik4yQtvWhExw'
 const AUTO_MINT_DIR = join(STATE_HOME, '.arcox-auto-mint')

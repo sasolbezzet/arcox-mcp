@@ -88,11 +88,19 @@ di-deploy sekali per chain. Konstruktor proxy `(_logic, initialOwner, _data)`: O
 membuat ProxyAdmin baru milik `initialOwner`, dan `_data` adalah panggilan
 `initialize` yang di-delegate.
 
-### Arc Mainnet (5042) — SUDAH ter-deploy
+### Arc Mainnet (5042) — proxy self-deploy, TIDAK DIPAKAI
+
+**Penting:** aplikasi tidak boleh memakai proxy ini. Stablecoin Service Circle
+menandatangani `ExecutionParams` di domain EIP-712
+`{"name":"Adapter","version":"1","chainId":5042,"verifyingContract":0x7FB8c7260b63934d8da38aF902f87ae6e284a845}`
+(`ADAPTER_CONTRACT_EVM_MAINNET` di `@circle-fin/provider-stablecoin-service-swap`),
+bukan di domain proxy ini. Akibatnya `execute()` di proxy ini selalu revert
+`InvalidSignature()` (0x8baa579f) setelah approve USDC sukses. Untuk mainnet,
+set `ARCOX_SWAP_ADAPTER_MAINNET=0x7FB8c7260b63934d8da38aF902f87ae6e284a845`.
 
 | Peran | Alamat |
 | --- | --- |
-| Alamat aktif aplikasi (**proxy**) | `0x8bc25dB1feda8Fc5eB20d0117Ff1f965F2F4E29C` |
+| Proxy self-deploy (tidak dipakai) | `0x8bc25dB1feda8Fc5eB20d0117Ff1f965F2F4E29C` |
 | Implementation (`Adapter`) | `0xA6EeE6c972825f7d746673D9a1E25Ca58BD11274` |
 | ProxyAdmin (hak upgrade) | `0x881037816Da1Cd38Ebe1d88250d3ddaEA994a4EA` |
 | `owner` adapter | `0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F` |
