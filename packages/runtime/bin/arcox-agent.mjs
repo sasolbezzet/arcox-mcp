@@ -86,7 +86,7 @@ const SEND_EXECUTION_TIMEOUT_MS = Number(process.env.SEND_EXECUTION_TIMEOUT_MS |
 const SEND_ESTIMATE_TIMEOUT_MS = Number(process.env.SEND_ESTIMATE_TIMEOUT_MS || '15000')
 const RPC_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || '8000')
 const SOLANA_CONFIRM_TIMEOUT_MS = Number(process.env.SOLANA_CONFIRM_TIMEOUT_MS || '45000')
-const PLATFORM_FEE_BPS = Number(process.env.ARCOX_ROUTER_FEE_BPS || '30')
+const PLATFORM_FEE_BPS = Number(process.env.ARCOX_ROUTER_FEE_BPS || '50')
 // Fallback hanya kalau backend tidak mengirim adapterContract. Alamat ini WAJIB
 // adapter milik Circle (ADAPTER_CONTRACT_EVM_MAINNET di
 // `@circle-fin/provider-stablecoin-service-swap`): Stablecoin Service menandatangani
