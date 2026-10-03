@@ -120,10 +120,13 @@ for (const entry of deployLog.chains) {
   const ownDomain = await client.readContract({ address, abi, functionName: 'supportedDestinationDomains', args: [c.cctpDomain] })
   check('local domain tidak didukung', ownDomain, false)
 
-  // quoteFee sanity: 1 USDC → 5% fee
+  // quoteFee sanity: 1 USDC dengan bps yang tercatat di log (feeBps bukan
+  // immutable — owner bisa mengubahnya lewat setFeeBps, jadi ekspektasinya
+  // mengikuti log, bukan angka 5% yang di-hardcode).
   const [fee, net] = await client.readContract({ address, abi, functionName: 'quoteFee', args: [1_000_000n] })
-  check('quoteFee(1 USDC).fee', formatUnits(fee, 6), '0.05')
-  check('quoteFee(1 USDC).net', formatUnits(net, 6), '0.95')
+  const expectedFeeUnits = BigInt(deployLog.feeBps) * 100n // 1 USDC × bps / 10_000
+  check('quoteFee(1 USDC).fee', formatUnits(fee, 6), formatUnits(expectedFeeUnits, 6))
+  check('quoteFee(1 USDC).net', formatUnits(net, 6), formatUnits(1_000_000n - expectedFeeUnits, 6))
 
   // provenance bytecode
   const deployed = await client.getBytecode({ address })

@@ -45,7 +45,7 @@ async function codeBytes(chain, address) {
 const fee = JSON.parse(readFileSync(join(DEPLOYMENTS, 'fee-router-mainnet.json'), 'utf8'))
 const swap = JSON.parse(readFileSync(join(DEPLOYMENTS, 'swap-adapter-mainnet.json'), 'utf8'))
 
-console.log('=== ARCOX FEE ROUTER (ArcoxRouter, solc 0.8.35, feeBps 500) ===')
+console.log(`=== ARCOX FEE ROUTER (ArcoxRouter, solc 0.8.35, feeBps ${fee.feeBps}) ===`)
 console.log(`treasury ${fee.treasury} | owner ${fee.owner}`)
 for (const c of fee.chains.filter((x) => x.address)) {
   const bytes = await codeBytes(c.chain, c.address)

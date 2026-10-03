@@ -13,7 +13,7 @@
  *   node packages/runtime/scripts/deploy-fee-router-mainnet.mjs \
  *     --key-file /home/ubuntu/arc-dex-api/.env:AI_ROUTER_DELEGATE_PRIVATE_KEY \
  *     --treasury 0x5d16e8ef186d6d0d984f9a50c7ddb16c106df40f \
- *     --fee-bps 500 --chains arc,base,arbitrum
+ *     --fee-bps 50 --chains arc,base,arbitrum
  *   # tambahkan --broadcast untuk benar-benar mengirim
  *
  * Setelah deploy, kontrak otomatis menyetel destination domain untuk 2 chain
@@ -59,7 +59,7 @@ const CHAINS = {
 }
 
 function parseArgs(argv) {
-  const out = { chains: 'arc,base,arbitrum', broadcast: false, feeBps: 500, gasPriceMultiplier: 1.25, gasLimitMultiplier: 1.2 }
+  const out = { chains: 'arc,base,arbitrum', broadcast: false, feeBps: 50, gasPriceMultiplier: 1.25, gasLimitMultiplier: 1.2 }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--broadcast') out.broadcast = true

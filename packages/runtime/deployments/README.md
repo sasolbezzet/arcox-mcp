@@ -12,9 +12,16 @@ Jaring destination domain lengkap: Arc → {6, 3}, Base → {26, 3}, Arbitrum �
 
 Parameter: `owner` = `0xE34FF1D2C925DDafB28C95C2396fC49A6f64569e`,
 `treasury` = `0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F` (**di ketiga chain**,
-diverifikasi on-chain oleh `mainnet:fee-router:verify`), `feeBps` = **500** (5%),
+diverifikasi on-chain oleh `mainnet:fee-router:verify`), `feeBps` = **50** (0,5%,
+disetel 3 Okt 2026 lewat `setFeeBps`; nilai deploy awal 500),
 `usdc` + `tokenMessenger` = alamat mainnet masing-masing chain (CCTP v2
 `0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d`), `localDomain` = 26 / 6 / 3.
+
+`feeBps` **bukan immutable**: kontrak punya `setFeeBps(uint16)` (owner-only), jadi
+kebijakan fee bisa berubah tanpa redeploy — alamat, verifikasi Sourcify, dan
+integrasi tetap valid. Ubah lewat `npm run mainnet:fee-router:fee` (lihat di bawah),
+lalu jalankan `mainnet:fee-router:verify` untuk memastikan semua chain sinkron.
+Hanya `usdc`, `tokenMessenger`, dan `localDomain` yang immutable.
 
 `fee-router-mainnet.json` adalah catatan otomatis dari skrip deploy + verifikasi.
 
@@ -64,13 +71,16 @@ npm run mainnet:balances -- --key-file ~/.arcox/agent.env:EOA_PRIVATE_KEY
 npm run mainnet:fee-router:deploy -- \
   --key-file ~/.arcox/agent.env:EOA_PRIVATE_KEY \
   --treasury 0x5d16E8Ef186d6D0d984f9A50C7ddb16C106DF40F \
-  --fee-bps 500 --chains arc,base
+  --fee-bps 50 --chains arc,base
 
 # 4. kirim (tambahkan --broadcast)
 npm run mainnet:fee-router:deploy -- ... --broadcast
 
 # 5. aktifkan destination domain (idempotent)
 npm run mainnet:fee-router:domains -- --key-file ~/.arcox/agent.env:EOA_PRIVATE_KEY --chains arc,base --broadcast
+
+# 5b. setel feeBps (owner-only, idempotent; tidak perlu redeploy)
+npm run mainnet:fee-router:fee -- --key-file ~/.arcox/agent.env:EOA_PRIVATE_KEY --fee-bps 50 --chains arc,base,arbitrum --broadcast
 
 # 6. verifikasi
 npm run mainnet:fee-router:verify
@@ -166,7 +176,7 @@ deploy proxy testnet memakai 872.864 gas.
 
 | | Fee Router (`ArcoxRouter`) | Swap Adapter (proxy `Adapter`) |
 | --- | --- | --- |
-| Treasury + fee 5% | ya (`feeBps` 500) | tidak |
+| Treasury + fee | ya (kini `feeBps` 50 = 0,5%, bisa diubah owner lewat `setFeeBps`) | tidak |
 | Per chain | Arc, Base, Arbitrum (semua ter-deploy) | Arc (ter-deploy); Base/Arbitrum belum |
 | Verifikasi | `mainnet:fee-router:verify` | `mainnet:swap-adapter:verify` |
 | Sumber | `mainnet:fee-router:verify-sources` | `--sourcify` pada verify adapter |

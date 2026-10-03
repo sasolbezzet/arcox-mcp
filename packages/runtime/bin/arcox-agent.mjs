@@ -139,8 +139,9 @@ async function quoteCirBtcAmmSwap(tokenIn, tokenOut, amountIn) {
     args: [tokenInAddr, tokenOutAddr, amountUnits],
   })
   const amountOutDecimal = formatUnits(amountOut, ARC_TOKENS[tokenOut].decimals)
-  // Fee Router mainnet di-deploy dengan feeBps 500 (5%).
-  const feeBps = Number(process.env.ARCOX_ROUTER_FEE_BPS || '500')
+  // Fee Router mainnet kini feeBps 50 (0,5%) — disetel lewat setFeeBps, bukan
+  // immutable. Env bisa menimpanya untuk kebijakan lain.
+  const feeBps = Number(process.env.ARCOX_ROUTER_FEE_BPS || '50')
   const feeAmount = (Number(amountIn) * feeBps / 10000).toFixed(ARC_TOKENS[tokenIn].decimals)
   return {
     available: true,
