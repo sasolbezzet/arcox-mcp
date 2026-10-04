@@ -91,9 +91,9 @@ npm run mainnet:fee-router:verify-sources
 
 **Kontrak `Adapter` tidak punya treasury maupun fee.** Fungsinya hanya eksekusi
 batch swap dengan tanda tangan EIP-712; parameter init-nya
-`initialize(address owner_, address signer_, uint256 signerThreshold_)`. Treasury 5%
-ada di Fee Router, bukan di sini — jadi alamat treasury tidak bisa dipasang ke
-kontrak ini. Alamat yang dipakai sistem adalah **proxy**; implementation hanya
+`initialize(address owner_, address signer_, uint256 signerThreshold_)`. Fee
+platform + treasury (kini 0,5%) ada di Fee Router, bukan di sini — jadi alamat
+treasury tidak bisa dipasang ke kontrak ini. Alamat yang dipakai sistem adalah **proxy**; implementation hanya
 di-deploy sekali per chain. Konstruktor proxy `(_logic, initialOwner, _data)`: OZ
 membuat ProxyAdmin baru milik `initialOwner`, dan `_data` adalah panggilan
 `initialize` yang di-delegate.

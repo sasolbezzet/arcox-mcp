@@ -7,7 +7,8 @@
  * Catatan penting soal kontraknya: `Adapter` TIDAK punya field treasury maupun fee.
  * Fungsinya: `initialize(address owner_, address signer_, uint256 signerThreshold_)`
  * lalu `execute(...)` / `executeSponsored(...)` dengan tanda tangan EIP-712 dari
- * signer. Treasury (fee 5%) ada di kontrak ARCOX Fee Router, bukan di sini.
+ * signer. Fee platform + treasury (kini 0,5%) ada di kontrak ARCOX Fee Router,
+ * bukan di sini.
  *
  * Konstruktor proxy: `(_logic, initialOwner, _data)`. OZ membuat ProxyAdmin baru
  * yang dimiliki `initialOwner`, jadi `--proxy-admin-owner` adalah pemilik admin
